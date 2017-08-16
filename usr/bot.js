@@ -19,7 +19,8 @@ bot.on('ready', function (evt) {
 });
 bot.on('message', function (user, userID, channelID, message, evt) {
     // Bot listens for '(cwl)'
-    if (message == '(cwl)') {
+    var substring = "(cwl)";
+    if (message.indexOf(substring) !== -1) {
         bot.sendMessage({
             to: channelID,
             message: ':joy:'
