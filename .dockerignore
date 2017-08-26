@@ -1,2 +1,7 @@
 .git
+.gitignore
+.github
+.gitattributes
 README.md
+node_modules
+npm-debug.log
