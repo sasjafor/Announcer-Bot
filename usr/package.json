@@ -1,8 +1,0 @@
-{
-  "name": "CWL Bot",
-  "version": "1.0.0",
-  "description": "Bot that responds to (cwl) with :joy:",
-  "main": "bot.js",
-  "author": "Sascha Forster",
-  "dependencies": {}
-}
