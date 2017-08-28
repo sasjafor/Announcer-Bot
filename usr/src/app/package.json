@@ -1,8 +1,11 @@
 {
-  "name": "CWL Bot",
+  "name": "CWL_Bot",
   "version": "1.0.0",
-  "description": "Bot that responds to (cwl) with :joy:",
+  "description": "Discord bot that responds to (cwl) with :joy:",
+  "author": "Sascha Forster <sascha.forster@hotmail.ch>",
   "main": "bot.js",
-  "author": "Sascha Forster",
+  "scripts": {
+    "start": "node bot.js"
+  },
   "dependencies": {}
 }
