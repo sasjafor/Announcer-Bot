@@ -12,4 +12,4 @@ RUN npm install discord.io winston --save
 COPY usr/src/app/ .
 
 EXPOSE 8080
-CMD nodejs bot.js
+CMD [ "npm", "start" ]
