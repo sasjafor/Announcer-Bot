@@ -4,12 +4,12 @@ FROM node:boron
 WORKDIR /usr/src/app
 
 # Install app dependencies
-COPY usr/package.json .
+COPY usr/src/app/package.json .
 
 RUN npm install discord.io winston --save
 
 # Copy source
-COPY usr/ .
+COPY usr/src/app .
 
 EXPOSE 8080
 CMD nodejs bot.js
