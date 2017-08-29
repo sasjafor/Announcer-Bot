@@ -4,7 +4,8 @@ FROM node:boron
 COPY usr/src/app /usr/src/app
 
 # Copy files to /config and install dependencies
-RUN cd /config && \
+RUN mkdir /config && \
+    cd /config && \
     cp /usr/src/app/* . && \
     npm install discord.io winston --save
 
