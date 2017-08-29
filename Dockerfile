@@ -8,9 +8,10 @@ COPY usr/src/app/package.json .
 
 RUN npm install discord.io winston --save
 
+VOLUME /config
+
 # Copy source
-COPY usr/src/app/ .
+COPY usr/src/app/ /config/
 
 EXPOSE 8080
-VOLUME /usr/src/app
 CMD [ "npm", "start" ]
