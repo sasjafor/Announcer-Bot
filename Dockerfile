@@ -10,4 +10,4 @@ RUN mkdir /config && \
 
 EXPOSE 8080
 VOLUME /config
-CMD [ "npm", "start" ]
+CMD ["/usr/src/run.sh"]
