@@ -12,4 +12,5 @@ RUN npm install discord.io winston --save
 COPY usr/src/app/ .
 
 EXPOSE 8080
+VOLUME /usr/src/app
 CMD [ "npm", "start" ]
