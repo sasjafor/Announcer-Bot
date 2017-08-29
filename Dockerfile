@@ -4,7 +4,8 @@ FROM node
 COPY root/ /
 
 # Make /config and install dependencies
-RUN apt-get update && \
+RUN deb http://ftp.debian.org/debian jessie-backports main && \
+    apt-get update && \
     apt-get install -y --no-install-recommends ffmpeg && \
     mkdir /config && \
     cd /usr/src/app && \
