@@ -10,7 +10,7 @@ RUN echo "deb http://ftp.debian.org/debian jessie-backports main" >> /etc/apt/so
                                                 espeak && \
     mkdir /config && \
     cd /usr/src/app && \
-    npm install discord.io winston --save
+    npm install discord.js node-opus ffmpeg-binaries --save
 
 EXPOSE 8080
 VOLUME /config
