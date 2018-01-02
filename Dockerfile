@@ -9,7 +9,7 @@ RUN echo "deb http://ftp.debian.org/debian jessie-backports main" >> /etc/apt/so
     apt-get install -y --no-install-recommends  ffmpeg && \
     mkdir /config && \
     cd /usr/src/app && \
-    npm install discord.js node-opus ffmpeg-binaries node-espeak --save
+    npm install discord.js node-opus ffmpeg-binaries simple-tts --save
 
 EXPOSE 8080
 VOLUME /config
