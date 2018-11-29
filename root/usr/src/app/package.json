@@ -1,14 +1,21 @@
 {
   "name": "SaschaBot",
-  "version": "1.0.0",
-  "description": "Basic Discord bot",
+  "version": "1.1.0",
+  "description": "Simple bot announcing users joining a voice channel written using discord.js",
   "author": "Sascha Forster <sascha.forster@hotmail.ch>",
   "main": "bot.js",
+  "repository": "https://github.com/sasjafor/Announcer-Bot",
   "scripts": {
     "start": "/usr/src/run.sh"
   },
   "dependencies": {
-    "discord.io": "^2.5.2",
-    "winston": "^2.3.1"
+    "@discordjs/uws": "^11.149.1",
+    "discord.js": "github:discordjs/discord.js",
+    "erlpack": "github:discordapp/erlpack",
+    "libsodium": "^0.7.3",
+    "node-opus": "^0.3.1",
+    "sodium": "^3.0.1",
+    "zlib-sync": "^0.1.4"
   }
 }
+
