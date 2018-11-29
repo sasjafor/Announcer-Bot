@@ -18,9 +18,8 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
   
 	let newMember = newState.member
 	let oldMember = oldState.member
-  
-	if(newUserChannel && newUserChannel.joinable && !newMember.user.bot && !newMember.voice.selfMute && !newMember.voice.serverMute && (oldMember.voice.selfMute || oldMember.voice.serverMute)) {
-  
+
+	if(newUserChannel && newUserChannel.joinable && !newMember.user.bot && !newState.mute && (!oldUserChannel || oldState.mute || oldState.channelID !== newState.channelID)) {
 		// User Joins a voice channel
 		if (!conn || conn.channel !== newUserChannel) {
 			conn = await newUserChannel.join()
@@ -46,7 +45,7 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 	}
 });
 
-client.on('message', message => {
+client.on('message', async message => {
 	if (message.channel.id == '511144158975623169') {
 		if (message.content == '!newfile') {
 			var audio_file = message.attachments.first();
@@ -68,7 +67,7 @@ client.on('message', message => {
 
 client.login(token);
 
-function announce(name, connection, channel) {
+async function announce(name, connection, channel) {
 	path = "/config/audio/" + name + ".wav";
 	if (names_list.indexOf(name) <= -1) {
 		fs.stat(path, function(err, stats) {
