@@ -4,7 +4,7 @@
   "description": "Simple bot announcing users joining a voice channel written using discord.js",
   "author": "Sascha Forster <sascha.forster@hotmail.ch>",
   "main": "src/bot.js",
-  "license": "MIT",
+  "license": "GPL",
   "keywords": [
     "discord",
     "bot",
