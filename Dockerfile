@@ -1,4 +1,4 @@
-FROM node
+FROM node:10
 
 # Copy run script
 COPY src/run.sh /usr/src/
@@ -6,14 +6,18 @@ COPY src/run.sh /usr/src/
 # Copy package.json
 COPY package.json /usr/src/app/
 
-# Setup apt and create /config
+# Setup apt, install non-node dependencies and create /config
 RUN echo "deb http://ftp.debian.org/debian jessie-backports main" >> /etc/apt/sources.list && \
     apt-get update && \
+    apt-get install -y --no-install-recommends espeak lame vorbis-tools && \
     mkdir /config
 
-# Install dependencies
+# Install node dependencies
 RUN cd /usr/src/app && \
     npm install --save-prod
+
+# Remove unnecessary packages
+#RUN apt-get purge bzip2
 
 # Copy bot script file
 COPY src/bot.js /usr/src/app/
