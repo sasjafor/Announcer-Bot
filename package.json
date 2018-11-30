@@ -1,13 +1,16 @@
 {
-  "name": "AnnouncerBot",
+  "name": "announcer-bot",
   "version": "1.1.0",
   "description": "Simple bot announcing users joining a voice channel written using discord.js",
   "author": "Sascha Forster <sascha.forster@hotmail.ch>",
-  "main": "bot.js",
-  "repository": "https://github.com/sasjafor/Announcer-Bot",
-  "scripts": {
-    "start": "/usr/src/run.sh"
-  },
+  "main": "src/bot.js",
+  "license": "MIT",
+  "keywords": [
+    "discord",
+    "bot",
+    "announce"
+  ],
+  "repository": "github:sasjafor/Announcer-Bot",
   "dependencies": {
     "@discordjs/uws": "^11.149.1",
     "discord.js": "github:discordjs/discord.js",
