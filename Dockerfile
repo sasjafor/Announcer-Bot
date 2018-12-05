@@ -16,9 +16,6 @@ RUN echo "deb http://ftp.debian.org/debian jessie-backports main" >> /etc/apt/so
 RUN cd /usr/src/app && \
     npm install --save-prod
 
-# Remove unnecessary packages
-#RUN apt-get purge bzip2
-
 # Copy bot script file
 COPY src/bot.js /usr/src/app/
 
