@@ -1,6 +1,6 @@
 {
   "name": "announcer-bot",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Simple bot announcing users joining a voice channel written using discord.js",
   "author": "Sascha Forster <sascha.forster@hotmail.ch>",
   "main": "src/bot.js",
