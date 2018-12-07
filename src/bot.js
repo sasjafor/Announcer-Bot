@@ -15,7 +15,7 @@ client.on('ready', () => {
 client.on('voiceStateUpdate', async (oldState, newState) => {
 	let newUserChannel = newState.channel
 	let oldUserChannel = oldState.channel
-  
+
 	let newMember = newState.member
 	let oldMember = oldState.member
 
@@ -31,13 +31,13 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 		// User leaves a voice channel
 		var members = oldUserChannel.members;
 		var leave = true;
-	
+
 		for (let [s,m] of members) {
 			if(m !== oldMember && !m.user.bot) {
 				leave = false;
 			}
 		}
-	
+
 		if (leave) {
 			oldUserChannel.leave();
 			conn = null;
@@ -46,21 +46,38 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 });
 
 client.on('message', async message => {
-	if (message.channel.id == '511144158975623169') {
-		if (message.content == '!newfile') {
+	if (message.channel.name == 'announcer-bot-submissions' && !message.author.bot) {
+		if (message.content.startsWith('!newfile')) {
 			var audio_file = message.attachments.first();
-			if (audio_file !== null && audio_file !== undefined) {
-				var filename = audio_file.url.split('/').pop();
-				filename = filename.replace(/_/g, ' ');
-				console.log(filename);
-				console.log(audio_file.url);
-				if (filename.includes('.wav') || filename.includes('.m4a') || filename.includes('.mp3') || filename.includes('.ogg')) {
-					var file = fs.createWriteStream("/config/audio/" + filename.slice(0,-3) + "wav");
-					var request = https.get(audio_file.url, function(response) {
-						response.pipe(file);
-					});
-				}
+			if (audio_file) {
+					var name = "";
+					var filename = audio_file.url.split('/').pop();
+					var file_type = filename.split('.').pop();
+					if (message.content.length > 8) {
+						name = message.content.slice(9);
+					} else {
+						name = filename;
+						name = name.replace(/_/g, ' ');
+					}
+					console.log(name);
+					console.log(audio_file.url);
+					console.log(file_type);
+					if (file_type == 'wav' ||
+						file_type == 'm4a' ||
+						file_type == 'mp3' ||
+						file_type == 'ogg') {
+						var file = fs.createWriteStream("/config/audio/" + name + ".wav");
+						var request = https.get(audio_file.url, function(response) {
+							response.pipe(file);
+						});
+					} else {
+						message.channel.send('Please send a supported file. Supported file types are:\n`WAV`\n`M4A`\n`MP3`\n`OGG`');
+					}
+			} else {
+				message.channel.send('Please attach an audio file');
 			}
+		} else {
+			message.channel.send('Please use the correct command format:\n`!newfile [NAME]`');
 		}
 	}
 });
