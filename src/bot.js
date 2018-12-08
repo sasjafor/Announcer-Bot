@@ -58,6 +58,7 @@ client.on('message', async message => {
 					} else {
 						name = filename;
 						name = name.replace(/_/g, ' ');
+						name = name.slice(0, -4);
 					}
 					console.log(name);
 					console.log(audio_file.url);
