@@ -6,7 +6,12 @@ const fs = require('fs');
 const https = require('https');
 const client = new Discord.Client();
 var names_list = [];
-var conn = null;
+
+try {
+	client.login(token);
+} catch (err) {
+	console.error(err);
+}
 
 client.on('ready', () => {
 	console.log('I am ready!');
@@ -21,10 +26,10 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
 
 	if(newUserChannel && newUserChannel.joinable && !newMember.user.bot && !newState.mute && (!oldUserChannel || oldState.mute || oldState.channelID !== newState.channelID)) {
 		// User Joins a voice channel
-		if (!conn || conn.channel !== newUserChannel) {
-			conn = await newUserChannel.join()
-			.catch(console.error);
-			//console.log("conn="+conn);
+		try {
+			var conn = await newUserChannel.join()
+		} catch (err) {
+			console.error(err);
 		}
 		announce(newMember.displayName, conn, newUserChannel);
 	} else if(oldUserChannel && (!newUserChannel || !newUserChannel.joinable)){
@@ -83,8 +88,6 @@ client.on('message', async message => {
 	}
 });
 
-client.login(token);
-
 async function announce(name, connection, channel) {
 	path = "/config/audio/" + name + ".wav";
 	if (names_list.indexOf(name) <= -1) {
@@ -112,3 +115,11 @@ async function announce(name, connection, channel) {
 		intent.destroy();
     });
 }
+
+client.on('error', error => {
+	console.error(error);
+});
+
+client.on('warn', warning => {
+	console.warn(warning);
+});
