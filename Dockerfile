@@ -1,24 +1,40 @@
-FROM node:10
+FROM rust:1.33
 
 # Copy run script
-COPY src/run.sh /usr/src/
+COPY src/run /bin
 
-# Copy package.json
-COPY package.json /usr/src/app/
+# Install rust toolchain
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 
-# Setup apt, install non-node dependencies and create /config
+# Setup apt, install package dependencies and create /config
 RUN echo "deb http://ftp.debian.org/debian jessie-backports main" >> /etc/apt/sources.list && \
     apt-get update && \
-    apt-get install -y --no-install-recommends espeak lame vorbis-tools && \
+    apt-get install -y --no-install-recommends  libespeak-dev \
+                                                lame \
+                                                libopus0 \
+                                                libssl-dev \
+                                                vorbis-tools \
+                                                && \
     mkdir /config
 
-# Install node dependencies
-RUN cd /usr/src/app && \
-    npm install --save-prod
+WORKDIR /usr/src
 
-# Copy bot script file
-COPY src/bot.js /usr/src/app/
+RUN USER=root cargo new app
 
-EXPOSE 8080
+COPY Cargo.toml /usr/src/app
+
+WORKDIR /usr/src/app
+
+RUN cargo build --release
+
+COPY src /usr/src/app/src
+
+RUN cargo build --release && \
+    mv target/release/announcer_bot /bin && \
+    rm -rf /usr/src/app
+
+WORKDIR /
+
+# EXPOSE 8080
 VOLUME /config
-CMD ["/usr/src/run.sh"]
+CMD ["run"]

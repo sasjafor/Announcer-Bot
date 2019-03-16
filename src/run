@@ -1,0 +1,5 @@
+#!/bin/bash
+#cp -r /usr/src/app/* /config/
+#while true; do
+DISCORD_APP_AUTH_TOKEN=${DISCORD_APP_AUTH_TOKEN} announcer_bot
+#done

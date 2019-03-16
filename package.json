@@ -11,15 +11,23 @@
     "announce"
   ],
   "repository": "github:sasjafor/Announcer-Bot",
+  "bin": {
+    "run-announcer-bot": "./cli.sh"
+  },
   "dependencies": {
     "@discordjs/uws": "^11.149.1",
     "discord.js": "github:discordjs/discord.js",
     "erlpack": "github:discordapp/erlpack",
     "ffmpeg-binaries": "^4.0.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "get-audio-duration": "^1.0.0",
     "libsodium": "^0.7.3",
     "node-opus": "^0.3.1",
     "simple-tts-docker": "^0.1.6",
     "sodium": "^3.0.1",
     "zlib-sync": "^0.1.4"
+  },
+  "devDependencies": {
+    "eslint": "^5.14.1"
   }
 }

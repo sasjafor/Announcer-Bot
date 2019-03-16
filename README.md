@@ -1,3 +1,5 @@
+[![ci-badge][]][ci] [![guild-badge][]][guild] [![crates.io version]][crates.io link] [![rust 1.31.1+ badge]][rust 1.31.1+ link]
+
 # Announcer Bot
 [![npm link](https://nodei.co/npm/announcer-bot.png?downloads=true&downloadRank=true)](https://www.npmjs.com/package/announcer-bot)
 
@@ -20,3 +22,12 @@ Custom audio files can be submitted in a text channel named "announcer-bot-submi
 If no name is provided, the name of the file is used, but any underscores are replaced with spaces.
 
 The audio files are stored in /config/audio because the bot is intended to be used within a docker container.
+
+[ci]: https://dev.azure.com/serenity-org/serenity/_build?definitionId=1
+[ci-badge]: https://img.shields.io/azure-devops/build/serenity-org/1ce9579e-03bc-499f-9302-4180a2dfec6f/1/current.svg?style=flat-square
+[crates.io link]: https://crates.io/crates/serenity
+[crates.io version]: https://img.shields.io/crates/v/serenity.svg?style=flat-square
+[guild]: https://discord.gg/WBdGJCc
+[guild-badge]: https://img.shields.io/discord/381880193251409931.svg?style=flat-square&colorB=7289DA
+[rust 1.31.1+ badge]: https://img.shields.io/badge/rust-1.31.1+-93450a.svg?style=flat-square
+[rust 1.31.1+ link]: https://blog.rust-lang.org/2018/12/20/Rust-1.31.1.html
