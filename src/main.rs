@@ -2,8 +2,6 @@
 #[macro_use] extern crate serenity;
 
 extern crate env_logger;
-extern crate espeak_sys;
-extern crate libc;
 
 use std::{
     env, 
@@ -13,15 +11,8 @@ use std::{
     ffi::CString,
     fs::File,
     io::prelude::*,
+    process::Command,
 };
-
-use espeak_sys::{
-    espeakCHARS_AUTO,
-    espeak_POSITION_TYPE,
-    espeak_Synth,
-};
-
-use libc::c_void;
 
 use serenity::client::bridge::voice::ClientVoiceManager;
 
@@ -77,26 +68,29 @@ impl EventHandler for Handler {
             }
         };
 
-        let is_bot = user.bot;
-
-        if !is_bot && !voice_state.self_mute {
-            info!("UNMUTE!");
-
-            let channel_id = match voice_state.channel_id {
-                Some(channel_id) => channel_id,
-                None => {
-                    info!("Channel id not found.");
-                    return;
-                }
-            };
-
-            let guild_id = match guild_id {
+        let guild_id = match guild_id {
                 Some(guild_id) => guild_id,
                 None => {
                     info!("Guild id not found.");
                     return;
                 }
             };
+
+        let channel_id = match voice_state.channel_id {
+                Some(channel_id) => channel_id,
+                None => {
+                    info!("Channel id not found.");
+                    let manager_lock = _ctx.data.write().get::<VoiceManager>().cloned().expect("Expected VoiceManager in ShareMap.");
+                    let mut manager = manager_lock.lock();
+                    manager.leave(guild_id);
+                    return;
+                }
+            };
+
+        let is_bot = user.bot;
+
+        if !is_bot && !voice_state.self_mute {
+            info!("UNMUTE!");
 
             let member = match guild_id.member(&_ctx, user_id) {
                 Ok(member) => member,
@@ -112,7 +106,18 @@ impl EventHandler for Handler {
             return;
         }
 
-        // TODO: disconnect when no human users in channel anymore
+        // let channel = match channel_id.to_channel() {
+        //     Ok(channel) => channel,
+        //     Err(err) => {
+        //         error!("Channel not found: {:?}", err);
+        //         return;
+        //     }
+        // };
+
+        // channel.mem
+
+        // // TODO: disconnect when no human users in channel anymore
+        // if 
     }
 }
 
@@ -137,7 +142,7 @@ fn main() {
 
     client.with_framework(StandardFramework::new()
         .configure(|c| c.prefix("!")) // set the bot's prefix to "!"
-        .cmd("ping", ping));
+        .cmd("newfile", newfile));
 
     // start listening for events by starting a single shard
     if let Err(why) = client.start() {
@@ -188,35 +193,53 @@ fn check_path(path: &str, name: &str) {
         debug!("Didn't find file: {}.", path);
         debug!("Creating new file with espeak.");
 
-        let mut data = Vec::new();
-        let bufptr = data.as_mut_ptr() as *mut c_void;
-        let c_str = CString::new(name).unwrap();
-        let c_null = null_mut();
-        unsafe {
-            espeak_Synth(c_str.as_ptr() as *const c_void, name.len() as u64, 0, espeak_POSITION_TYPE::POS_CHARACTER, 
-                0, espeakCHARS_AUTO, c_null, bufptr);
-        }
-
-        let mut file = match File::create(path) {
-            Ok(file) => file,
-            Err(err) => {
-                error!("Error creating file {}", err);
-                return;
-            } 
-        };
-
-        let user_data = &data[..];
-
-        match file.write_all(user_data) {
-            Ok(()) => return,
-            Err(err) => {
-                error!("Error writing to file {}", err);
-            }
-        };
+        Command::new("espeak").arg("-w").arg(path).arg(name).output().expect("Failed to run espeak!");
     }
 }
 
-command!(ping(_context, message) {
-    info!("SENDING PONG!");
-    let _ = message.reply(_context, "Pong!");
+command!(newfile(_context, message, args) {
+    let channel_name = match message.channel_id.name(&_context) {
+        Some(name) => name,
+        None => {
+            debug!("No channel name found");
+            return Ok(());
+        }
+    };
+    if channel_name == "announcer-bot-submissions" {
+
+    let attachments = &message.attachments;
+    if !attachments.is_empty() {
+        let audio_file = &attachments[0];
+        let content = match audio_file.download() {
+            Ok(content) => content,
+            Err(why) => {
+                error!("Error downloading attachment: {:?}", why);
+                // let _ = message.channel_id.say(, "Error downloading attachment");
+                return Ok(());
+            },
+        };
+
+        let mut name = args.rest();
+
+        if name.is_empty() {
+            name = &audio_file.filename;
+        }
+
+        let mut file = match File::create("/config/audio/".to_owned() + name + ".wav") {
+            Ok(file) => file,
+            Err(why) => {
+                error!("Error creating file: {:?}", why);
+                // let _ = message.channel_id.say("Error creating file");
+                return Ok(());
+            },
+        };
+
+        if let Err(why) = file.write(&content) {
+            error!("Error writing to file: {:?}", why);
+            return Ok(());
+        }
+    } else {
+
+    }
+    }
 });
