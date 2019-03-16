@@ -1,5 +1,5 @@
 #!/bin/bash
 #cp -r /usr/src/app/* /config/
 #while true; do
-DISCORD_APP_AUTH_TOKEN=${DISCORD_APP_AUTH_TOKEN} RUST_LOG=error announcer_bot
+DISCORD_APP_AUTH_TOKEN=${DISCORD_APP_AUTH_TOKEN} RUST_LOG=info announcer_bot
 #done

@@ -6,7 +6,8 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 # Setup apt, install package dependencies and create /config
 RUN echo "deb http://ftp.debian.org/debian jessie-backports main" >> /etc/apt/sources.list && \
     apt-get update && \
-    apt-get install -y --no-install-recommends  espeak\
+    apt-get install -y --no-install-recommends  espeak \
+                                                ffmpeg \
                                                 lame \
                                                 libopus0 \
                                                 libssl-dev \
