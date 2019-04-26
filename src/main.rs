@@ -9,6 +9,7 @@ use std::{
     path::Path,
     ptr::null_mut,
     ffi::CString,
+    fs,
     fs::File,
     io::prelude::*,
     process::Command,
@@ -20,7 +21,7 @@ use serenity::{client::{Context}, prelude::Mutex};
 
 use serenity::{
     client::{
-        Cache,
+        CACHE,
         Client,
         EventHandler,
     },
@@ -60,7 +61,7 @@ impl EventHandler for Handler {
     fn voice_state_update(&self, _ctx: Context, guild_id: Option<GuildId>, voice_state: VoiceState) {
         let user_id = voice_state.user_id;
 
-        let user = match user_id.to_user(&_ctx) {
+        let user = match user_id.to_user() {
             Ok(user) => user,
             Err(e) => {
                 error!("User not found: {:?}", e);
@@ -80,7 +81,7 @@ impl EventHandler for Handler {
                 Some(channel_id) => channel_id,
                 None => {
                     info!("Channel id not found.");
-                    let manager_lock = _ctx.data.write().get::<VoiceManager>().cloned().expect("Expected VoiceManager in ShareMap.");
+                    let manager_lock = _ctx.data.lock().get::<VoiceManager>().cloned().expect("Expected VoiceManager in ShareMap.");
                     let mut manager = manager_lock.lock();
                     manager.leave(guild_id);
                     return;
@@ -92,7 +93,7 @@ impl EventHandler for Handler {
         if !is_bot && !voice_state.self_mute {
             info!("UNMUTE!");
 
-            let member = match guild_id.member(&_ctx, user_id) {
+            let member = match guild_id.member(user_id) {
                 Ok(member) => member,
                 Err(e) => {
                     error!("Member not found: {:?}", e);
@@ -136,7 +137,7 @@ fn main() {
         .expect("Error creating client");
 
     {
-        let mut data = client.data.write();
+        let mut data = client.data.lock();
         data.insert::<VoiceManager>(Arc::clone(&client.voice_manager));
     }
 
@@ -151,7 +152,7 @@ fn main() {
 }
 
 fn announce(_ctx: Context, channel_id: ChannelId, guild_id: GuildId, name: String) {
-    let manager_lock = _ctx.data.write().get::<VoiceManager>().cloned().expect("Expected VoiceManager in ShareMap.");
+    let manager_lock = _ctx.data.lock().get::<VoiceManager>().cloned().expect("Expected VoiceManager in ShareMap.");
     let mut manager = manager_lock.lock();
 
     if let Some(old_handler) = manager.get_mut(guild_id) {
@@ -162,9 +163,16 @@ fn announce(_ctx: Context, channel_id: ChannelId, guild_id: GuildId, name: Strin
         }
     }
 
-    if manager.join(guild_id, channel_id).is_some() {
-        debug!("Joined {}", channel_id.mention());
-        if let Some(handler) = manager.get_mut(guild_id) {
+    let handler = match manager.join(guild_id, channel_id) {
+        Some(handler) => handler,
+        None => {
+            error!("Joining voice channel");
+            return;
+        }
+    };
+        // if 
+            // handler.join(channel_id);
+            debug!("Joined {}", channel_id.mention());
             let path = "/config/audio/".to_owned() + &name + ".wav";
 
             info!("Path={}", path);
@@ -180,12 +188,10 @@ fn announce(_ctx: Context, channel_id: ChannelId, guild_id: GuildId, name: Strin
             };
             handler.play(source);
             info!("Playing sound file for {}", name);
-        } else {
-            debug!("Not in a voice channel to play in");
-        }
-    } else {
-        error!("Error joining the channel");
-    }
+        // } else {
+        //     debug!("Not in a voice channel to play in");
+        // }
+    
 }
 
 fn check_path(path: &str, name: &str) {
@@ -198,7 +204,7 @@ fn check_path(path: &str, name: &str) {
 }
 
 command!(newfile(_context, message, args) {
-    let channel_name = match message.channel_id.name(&_context) {
+    let channel_name = match message.channel_id.name() {
         Some(name) => name,
         None => {
             debug!("No channel name found");
@@ -219,13 +225,16 @@ command!(newfile(_context, message, args) {
             },
         };
 
-        let mut name = args.rest();
+        let mut name: &str = args.rest();
 
+        let filename: String;
         if name.is_empty() {
-            name = &audio_file.filename;
+            filename = audio_file.filename.to_owned();
+        } else {
+            filename = name.to_owned() + ".wav";
         }
 
-        let mut file = match File::create("/config/audio/".to_owned() + name + ".wav") {
+        let mut file = match File::create("/config/audio/".to_owned() + &filename) {
             Ok(file) => file,
             Err(why) => {
                 error!("Error creating file: {:?}", why);
@@ -238,6 +247,37 @@ command!(newfile(_context, message, args) {
             error!("Error writing to file: {:?}", why);
             return Ok(());
         }
+
+        // normalise the audio file
+        let normalise = Command::new("ffmpeg-normalize")
+                .arg("-f")
+                .arg("-c:a")
+                .arg("libmp3lame")
+                .arg("-b:a")
+                .arg("128K")
+                .arg(&filename)
+                .arg("-o")
+                .arg(&filename)
+                .current_dir("/config/audio")
+                .status()
+                .expect("Failed to run ffmpeg-normalize");
+        // println!("NORMALISE STATUS: {}", normalise);
+        
+        // trim length to 5s
+        let trim = Command::new("ffmpeg")
+                .arg("-i")
+                .arg(&filename)
+                .arg("-t")
+                .arg("00:00:06")
+                .arg(filename.to_owned() + "tmp.wav")
+                .current_dir("/config/audio")
+                .status()
+                .expect("Failed to shorten length with ffmpeg");
+        // println!("TRIM STATUS: {}", trim);
+        
+        
+        fs::rename("/config/audio/".to_owned() + &filename + "tmp.wav", "/config/audio/".to_owned() + &filename)?;
+        // println!("RENAME STATUS: {}", rename.);
     } else {
 
     }

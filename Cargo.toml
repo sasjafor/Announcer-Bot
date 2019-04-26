@@ -21,5 +21,9 @@ features = [
     "cache",
     "voice",
 ]
-git = "https://github.com/serenity-rs/serenity"
-rev = "722e1cc"
+# git = "https://github.com/serenity-rs/serenity"
+# rev = "722e1cc"
+version = "0.5.13"
+
+[patch.crates-io]
+openssl = { git = "https://github.com/ishitatsuyuki/rust-openssl", branch = "0.9.x" }

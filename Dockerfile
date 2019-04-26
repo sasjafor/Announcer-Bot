@@ -1,19 +1,25 @@
-FROM rust:1.33
+FROM rust:1.34
 
 # Install rust toolchain
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 
 # Setup apt, install package dependencies and create /config
-RUN echo "deb http://ftp.debian.org/debian jessie-backports main" >> /etc/apt/sources.list && \
-    apt-get update && \
+# RUN echo "deb http://ftp.debian.org/debian jessie-backports main" >> /etc/apt/sources.list && \
+RUN apt-get update && \
     apt-get install -y --no-install-recommends  espeak \
                                                 ffmpeg \
+                                                python3 \
+                                                python3-pip \
+                                                python3-setuptools \
                                                 lame \
                                                 libopus0 \
                                                 libssl-dev \
                                                 vorbis-tools \
                                                 && \
     mkdir /config
+
+# Install ffmpeg-normalize
+RUN pip3 install ffmpeg-normalize
 
 # Create empty shell project
 RUN USER=root cargo new --bin announcer_bot
