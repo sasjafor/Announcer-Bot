@@ -1,4 +1,4 @@
-[![ci-badge][]][ci] [![guild-badge][]][guild] [![crates.io version]][crates.io link] [![rust 1.31.1+ badge]][rust 1.31.1+ link]
+
 
 # Announcer Bot
 [![npm link](https://nodei.co/npm/announcer-bot.png?downloads=true&downloadRank=true)](https://www.npmjs.com/package/announcer-bot)
