@@ -33,6 +33,9 @@ COPY ./Cargo.toml ./Cargo.toml
 RUN cargo build --release
 RUN rm src/*.rs
 
+# Set log level
+ENV RUST_LOG warn
+
 # Copy run script
 COPY src/run /bin
 
