@@ -7,8 +7,6 @@ use std::{
     env, 
     sync::Arc,
     path::Path,
-    ptr::null_mut,
-    ffi::CString,
     fs,
     fs::File,
     io::prelude::*,
@@ -21,7 +19,6 @@ use serenity::{client::{Context}, prelude::Mutex};
 
 use serenity::{
     client::{
-        CACHE,
         Client,
         EventHandler,
     },
@@ -32,10 +29,8 @@ use serenity::{
         id::GuildId,
         id::ChannelId,
         voice::VoiceState,
-        channel::Message,
+        guild::Guild,
     },
-    Result as SerenityResult,
-    http,
     voice,
 };
 
@@ -75,18 +70,44 @@ impl EventHandler for Handler {
                     info!("Guild id not found.");
                     return;
                 }
-            };
+        };
 
         let channel_id = match voice_state.channel_id {
                 Some(channel_id) => channel_id,
                 None => {
                     info!("Channel id not found.");
-                    let manager_lock = _ctx.data.lock().get::<VoiceManager>().cloned().expect("Expected VoiceManager in ShareMap.");
+                    let mut data = _ctx.data.lock();
+                    let manager_lock = data.get::<VoiceManager>().cloned().expect("Expected VoiceManager in ShareMap.");
                     let mut manager = manager_lock.lock();
-                    manager.leave(guild_id);
+                    let mut handler = match manager.get_mut(guild_id) {
+                        Some(handler) => handler,
+                        None => {
+                            info!("No handler found.");
+                            return;
+                        }
+                    };
+                    let self_channel_id = match handler.channel_id {
+                        Some(id) => id,
+                        None => {
+                            info!("Not connected to a channel.");
+                            return;
+                        }
+                    };
+
+                    let guild = match guild_id.to_guild_cached() {
+                        Some(guild) => guild.read().clone(),
+                        None => {
+                            info!("Guild not found in cache.");
+                            return;
+                        }
+                    };
+
+                    if voice_channel_is_empty(guild, self_channel_id) {
+                        handler.leave();
+                    }
                     return;
                 }
-            };
+        };
 
         let is_bot = user.bot;
 
@@ -106,19 +127,6 @@ impl EventHandler for Handler {
             announce(_ctx, channel_id, guild_id, name);
             return;
         }
-
-        // let channel = match channel_id.to_channel() {
-        //     Ok(channel) => channel,
-        //     Err(err) => {
-        //         error!("Channel not found: {:?}", err);
-        //         return;
-        //     }
-        // };
-
-        // channel.mem
-
-        // // TODO: disconnect when no human users in channel anymore
-        // if 
     }
 }
 
@@ -170,28 +178,38 @@ fn announce(_ctx: Context, channel_id: ChannelId, guild_id: GuildId, name: Strin
             return;
         }
     };
-        // if 
-            // handler.join(channel_id);
-            debug!("Joined {}", channel_id.mention());
-            let path = "/config/audio/".to_owned() + &name + ".wav";
 
-            info!("Path={}", path);
+    debug!("Joined {}", channel_id.mention());
+    let path = "/config/audio/".to_owned() + &name + ".wav";
 
-            check_path(&path, &name);
+    info!("Path={}", path);
 
-            let source = match voice::ffmpeg(path) {
-                Ok(source) => source,
-                Err(why) => {
-                    error!("Err starting source: {:?}", why);
-                    return;
-                },
-            };
-            handler.play(source);
-            info!("Playing sound file for {}", name);
-        // } else {
-        //     debug!("Not in a voice channel to play in");
-        // }
-    
+    check_path(&path, &name);
+
+    let source = match voice::ffmpeg(path) {
+        Ok(source) => source,
+        Err(err) => {
+            error!("Err starting source: {:?}", err);
+            return;
+        },
+    };
+    handler.play(source);
+    info!("Playing sound file for {}", name);
+}
+
+fn voice_channel_is_empty(guild: Guild, channel_id: ChannelId) -> bool {
+    let mut is_empty = true;
+    for state in guild.voice_states.values().filter(|state| state.channel_id == Some(channel_id)) {
+        let user = match state.user_id.to_user() {
+            Ok(user) => user,
+            Err(err) => {
+                error!("Error retrieving user: {:?}", err);
+                return is_empty;
+            }
+        };
+        is_empty &= user.bot;
+    }
+    return is_empty;
 }
 
 fn check_path(path: &str, name: &str) {
@@ -199,7 +217,12 @@ fn check_path(path: &str, name: &str) {
         debug!("Didn't find file: {}.", path);
         debug!("Creating new file with espeak.");
 
-        Command::new("espeak").arg("-w").arg(path).arg(name).output().expect("Failed to run espeak!");
+        Command::new("espeak")
+                .arg("-w")
+                .arg(path)
+                .arg(name)
+                .output()
+                .expect("Failed to run espeak!");
     }
 }
 
@@ -220,7 +243,7 @@ command!(newfile(_context, message, args) {
             Ok(content) => content,
             Err(why) => {
                 error!("Error downloading attachment: {:?}", why);
-                // let _ = message.channel_id.say(, "Error downloading attachment");
+                let _ = message.channel_id.say("Error downloading attachment");
                 return Ok(());
             },
         };
@@ -238,7 +261,7 @@ command!(newfile(_context, message, args) {
             Ok(file) => file,
             Err(why) => {
                 error!("Error creating file: {:?}", why);
-                // let _ = message.channel_id.say("Error creating file");
+                let _ = message.channel_id.say("Error creating file");
                 return Ok(());
             },
         };
@@ -249,7 +272,7 @@ command!(newfile(_context, message, args) {
         }
 
         // normalise the audio file
-        let normalise = Command::new("ffmpeg-normalize")
+        let _normalise = Command::new("ffmpeg-normalize")
                 .arg("-f")
                 .arg("-c:a")
                 .arg("libmp3lame")
@@ -259,27 +282,23 @@ command!(newfile(_context, message, args) {
                 .arg("-o")
                 .arg(&filename)
                 .current_dir("/config/audio")
-                .status()
+                .output()
                 .expect("Failed to run ffmpeg-normalize");
-        // println!("NORMALISE STATUS: {}", normalise);
         
         // trim length to 5s
-        let trim = Command::new("ffmpeg")
+        let _trim = Command::new("ffmpeg")
                 .arg("-i")
                 .arg(&filename)
                 .arg("-t")
                 .arg("00:00:06")
                 .arg(filename.to_owned() + "tmp.wav")
                 .current_dir("/config/audio")
-                .status()
-                .expect("Failed to shorten length with ffmpeg");
-        // println!("TRIM STATUS: {}", trim);
-        
+                .output()
+                .expect("Failed to shorten length with ffmpeg");        
         
         fs::rename("/config/audio/".to_owned() + &filename + "tmp.wav", "/config/audio/".to_owned() + &filename)?;
-        // println!("RENAME STATUS: {}", rename.);
     } else {
-
+        let _ = message.channel_id.say("Please attach an audio file");
     }
     }
 });
