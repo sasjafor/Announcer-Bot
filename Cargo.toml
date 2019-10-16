@@ -1,11 +1,11 @@
 [package]
 name = "announcer_bot"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["sasjafor <john93412@gmail.com>"]
 
 [dependencies]
-log = "0.4.6"
-env_logger = "0.6.1"
+log = "0.4.8"
+env_logger = "0.7.0"
 
 [dependencies.serenity]
 default-features = false
@@ -20,10 +20,11 @@ features = [
     "utils",
     "cache",
     "voice",
+    "native_tls_backend",
 ]
 # git = "https://github.com/serenity-rs/serenity"
 # rev = "722e1cc"
-version = "0.5.13"
+version = "0.7.1"
 
-[patch.crates-io]
-openssl = { git = "https://github.com/ishitatsuyuki/rust-openssl", branch = "0.9.x" }
+# [patch.crates-io]
+# openssl = { git = "https://github.com/ishitatsuyuki/rust-openssl", branch = "0.9.x" }

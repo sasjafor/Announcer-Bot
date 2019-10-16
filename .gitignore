@@ -5,3 +5,4 @@ test_run.sh
 
 /target
 **/*.rs.bk
+test_functions.txt
