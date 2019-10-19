@@ -1,4 +1,4 @@
-FROM rust:1.34
+FROM rust:1.38
 
 # Install rust toolchain
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
@@ -8,12 +8,12 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 RUN apt-get update && \
     apt-get install -y --no-install-recommends  espeak \
                                                 ffmpeg \
-                                                python3 \
-                                                python3-pip \
-                                                python3-setuptools \
                                                 lame \
                                                 libopus0 \
                                                 libssl-dev \
+                                                python3 \
+                                                python3-pip \
+                                                python3-setuptools \
                                                 vorbis-tools \
                                                 && \
     mkdir /config
