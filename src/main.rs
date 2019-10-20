@@ -5,7 +5,6 @@ extern crate env_logger;
 extern crate serenity;
 
 use std::{
-    collections::HashMap,
     env, 
     fs, 
     fs::File, 
@@ -15,10 +14,6 @@ use std::{
     sync::{
         Arc,
     },
-    thread,
-    time::{
-        self,
-    }
 };
 
 use serenity::{
@@ -54,12 +49,6 @@ struct VoiceManager;
 
 impl TypeMapKey for VoiceManager {
     type Value = Arc<Mutex<ClientVoiceManager>>;
-}
-
-struct VoiceStreamCounter;
-
-impl TypeMapKey for VoiceStreamCounter {
-    type Value = HashMap<ChannelId, u8>;
 }
 
 struct Handler;
@@ -169,7 +158,6 @@ fn main() {
     {
         let mut data = client.data.write();
         data.insert::<VoiceManager>(Arc::clone(&client.voice_manager));
-        data.insert::<VoiceStreamCounter>(HashMap::default());
     }
 
     client.with_framework(StandardFramework::new().configure(|c| c.prefix("!"))); // set the bot's prefix to "!"
@@ -192,12 +180,6 @@ fn main() {
 }
 
 fn announce(ctx: Context, channel_id: ChannelId, guild_id: GuildId, name: String) {
-    // let count = get_stream_count(&ctx, channel_id);
-    // info!("{}", count);
-    // if count > 5 {
-    //     return;
-    // }
-
     let manager_lock = &ctx
         .data
         .read()
@@ -238,15 +220,6 @@ fn announce(ctx: Context, channel_id: ChannelId, guild_id: GuildId, name: String
     };
     handler.play(source);
 
-    // add_stream_count(&ctx, channel_id);
-
-    // thread::spawn(move || {
-    //     debug!("SUB before");
-    //     let duration = time::Duration::from_secs(5);
-    //     thread::sleep(duration);
-    //     sub_stream_count(&ctx, channel_id);
-    // });
-
     info!("Playing sound file for {}", name);
 }
 
@@ -284,34 +257,6 @@ fn check_path(path: &str, name: &str) {
 
         fs::write(text_path, name).expect("Unable to write file");
     }
-}
-
-fn add_stream_count(ctx: &Context, channel: ChannelId)
-{
-    let mut data = ctx.data.write();
-    let counter = data.get_mut::<VoiceStreamCounter>().unwrap();
-    let entry = counter.entry(channel).or_insert(0);
-    *entry += 1;
-}
-
-fn sub_stream_count(ctx: &Context, channel: ChannelId)
-{
-    debug!("SUB ACTUAL!");
-    let mut data = ctx.data.write();
-    let counter = data.get_mut::<VoiceStreamCounter>().unwrap();
-    let entry = counter.entry(channel).or_insert(0);
-    if *entry > 0 {
-        *entry -= 1;
-    }
-}
-
-fn get_stream_count(ctx: &Context, channel: ChannelId) -> u8
-{
-    let mut data = ctx.data.write();
-    let counter = data.get_mut::<VoiceStreamCounter>().unwrap();
-    let entry = counter.entry(channel).or_insert(0);
-
-    return *entry
 }
 
 #[command]
