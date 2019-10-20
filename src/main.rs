@@ -174,6 +174,17 @@ fn main() {
 
     client.with_framework(StandardFramework::new().configure(|c| c.prefix("!"))); // set the bot's prefix to "!"
 
+    let audio = Path::new("/config/audio");
+    let queue = Path::new("/config/queue");
+
+    if !audio.exists() {
+        let _ = fs::create_dir(audio);
+    }
+
+    if !queue.exists() {
+        let _ = fs::create_dir(queue);
+    }
+
     // start listening for events by starting a single shard
     if let Err(why) = client.start() {
         error!("Client error: {:?}", why);
@@ -181,11 +192,11 @@ fn main() {
 }
 
 fn announce(ctx: Context, channel_id: ChannelId, guild_id: GuildId, name: String) {
-    let count = get_stream_count(&ctx, channel_id);
-    info!("{}", count);
-    if count > 10 {
-        return;
-    }
+    // let count = get_stream_count(&ctx, channel_id);
+    // info!("{}", count);
+    // if count > 5 {
+    //     return;
+    // }
 
     let manager_lock = &ctx
         .data
@@ -227,14 +238,14 @@ fn announce(ctx: Context, channel_id: ChannelId, guild_id: GuildId, name: String
     };
     handler.play(source);
 
-    add_stream_count(&ctx, channel_id);
+    // add_stream_count(&ctx, channel_id);
 
-    thread::spawn(move || {
-        debug!("SUB before");
-        let duration = time::Duration::from_secs(5);
-        thread::sleep(duration);
-        sub_stream_count(&ctx, channel_id);
-    });
+    // thread::spawn(move || {
+    //     debug!("SUB before");
+    //     let duration = time::Duration::from_secs(5);
+    //     thread::sleep(duration);
+    //     sub_stream_count(&ctx, channel_id);
+    // });
 
     info!("Playing sound file for {}", name);
 }

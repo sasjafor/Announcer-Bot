@@ -5,7 +5,7 @@ authors = ["sasjafor <john93412@gmail.com>"]
 
 [dependencies]
 log = "0.4.8"
-env_logger = "0.7.0"
+env_logger = "0.7.1"
 
 [dependencies.serenity]
 default-features = false
@@ -22,9 +22,9 @@ features = [
     "voice",
     "native_tls_backend",
 ]
-# git = "https://github.com/serenity-rs/serenity"
-# rev = "722e1cc"
-version = "0.7.1"
+git = "https://github.com/serenity-rs/serenity"
+rev = "c4b1c6033c7b21ac314ce6845be957ca69b1d223"
+# version = "0.7.1"
 
 # [patch.crates-io]
 # openssl = { git = "https://github.com/ishitatsuyuki/rust-openssl", branch = "0.9.x" }

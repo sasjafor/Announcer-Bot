@@ -7,3 +7,4 @@ debug_test_run.sh
 /target
 **/*.rs.bk
 test_functions.txt
+experimental_test_functions.txt
