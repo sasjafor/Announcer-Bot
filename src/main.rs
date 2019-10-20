@@ -25,7 +25,10 @@ use serenity::{
     },
     framework::{
         standard::{
-            macros::command, 
+            macros::{
+                command,
+                group,
+            }, 
             Args,
             CommandResult,
         },
@@ -143,6 +146,12 @@ impl EventHandler for Handler {
     }
 }
 
+group!({
+    name: "general",
+    options: {},
+    commands: [newfile],
+});
+
 fn main() {
     // Initialize the logger to use environment variables.
     //
@@ -160,7 +169,11 @@ fn main() {
         data.insert::<VoiceManager>(Arc::clone(&client.voice_manager));
     }
 
-    client.with_framework(StandardFramework::new().configure(|c| c.prefix("!"))); // set the bot's prefix to "!"
+    client.with_framework(StandardFramework::new()
+            .group(&GENERAL_GROUP)
+            .configure(|c| c
+                .prefix("!")
+            )); // set the bot's prefix to "!"
 
     let audio = Path::new("/config/audio");
     let queue = Path::new("/config/queue");
