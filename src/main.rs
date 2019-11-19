@@ -346,6 +346,10 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
                 "/config/audio/".to_owned() + &filename + "tmp.wav",
                 "/config/audio/".to_owned() + &filename,
             )?;
+
+            let text_path = "/config/queue/".to_owned() + &name;
+
+            fs::remove_file(text_path)?;
         } else {
             let _ = message.channel_id.say(&ctx, "Please attach an audio file");
         }
