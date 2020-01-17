@@ -146,11 +146,9 @@ impl EventHandler for Handler {
     }
 }
 
-group!({
-    name: "general",
-    options: {},
-    commands: [newfile],
-});
+#[group]
+#[commands(newfile)]
+struct General;
 
 fn main() {
     // Initialize the logger to use environment variables.

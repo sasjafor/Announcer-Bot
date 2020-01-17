@@ -1,4 +1,4 @@
-FROM rust:1.38
+FROM rust:1.40
 
 # Install rust toolchain
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
