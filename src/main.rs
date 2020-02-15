@@ -65,7 +65,7 @@ impl EventHandler for Handler {
         info!("Resumed");
     }
 
-    fn voice_state_update(&self, ctx: Context, guild_id: Option<GuildId>, _old: Option<VoiceState>, new_state: VoiceState) {
+    fn voice_state_update(&self, ctx: Context, guild_id: Option<GuildId>, old_state: Option<VoiceState>, new_state: VoiceState) {
         let user_id = new_state.user_id;
 
         let user = match user_id.to_user(&ctx) {
@@ -83,6 +83,14 @@ impl EventHandler for Handler {
                 return;
             }
         };
+
+        let guild = match guild_id.to_guild_cached(&ctx) {
+                    Some(guild) => guild.read().clone(),
+                    None => {
+                        info!("Guild not found in cache.");
+                        return;
+                    }
+                };
 
         let channel_id = match new_state.channel_id {
             Some(channel_id) => channel_id,
@@ -110,20 +118,43 @@ impl EventHandler for Handler {
                     }
                 };
 
-                let guild = match guild_id.to_guild_cached(&ctx) {
-                    Some(guild) => guild.read().clone(),
-                    None => {
-                        info!("Guild not found in cache.");
-                        return;
-                    }
-                };
-
                 if voice_channel_is_empty(&ctx, guild, self_channel_id) {
                     handler.leave();
                 }
                 return;
             }
         };
+
+        if old_state.is_none() {
+            if user_id == 239705630913331201 {
+                let mut user_check = guild
+                                    .voice_states
+                                    .values()
+                                    .filter(|state| state.channel_id == Some(channel_id))
+                                    .filter(|state| state.user_id == 180995420196044809)
+                                    .peekable();
+                    
+                if user_check.peek().is_some() {
+                    let path = "/config/StGallerConnection.mp3";
+                    play_file(&ctx, channel_id, guild_id, &path);
+                }
+            }
+
+            if user_id == 180995420196044809 {
+                let mut user_check = guild
+                                    .voice_states
+                                    .values()
+                                    .filter(|state| state.channel_id == Some(channel_id))
+                                    .filter(|state| state.user_id == 239705630913331201)
+                                    .peekable();
+                    
+                if user_check.peek().is_some() {
+                    info!("cousins");
+                    let path = "/config/StGallerConnection.mp3";
+                    play_file(&ctx, channel_id, guild_id, &path);
+                }
+            }
+        }
 
         let is_bot = user.bot;
 
@@ -140,7 +171,7 @@ impl EventHandler for Handler {
 
             let name = member.display_name().to_string();
 
-            announce(ctx, channel_id, guild_id, name);
+            announce(&ctx, channel_id, guild_id, &name);
             return;
         }
     }
@@ -190,7 +221,16 @@ fn main() {
     }
 }
 
-fn announce(ctx: Context, channel_id: ChannelId, guild_id: GuildId, name: String) {
+fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, name: &str) {
+    debug!("Joined {}", channel_id.mention());
+    let path = "/config/audio/".to_owned() + &name + ".wav";
+
+    check_path(&path, &name);
+
+    play_file(ctx, channel_id, guild_id, &path);
+}
+
+fn play_file(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, path: &str) {
     let manager_lock = &ctx
         .data
         .read()
@@ -215,13 +255,6 @@ fn announce(ctx: Context, channel_id: ChannelId, guild_id: GuildId, name: String
         }
     };
 
-    debug!("Joined {}", channel_id.mention());
-    let path = "/config/audio/".to_owned() + &name + ".wav";
-
-    info!("Path={}", path);
-
-    check_path(&path, &name);
-
     let source = match voice::ffmpeg(path) {
         Ok(source) => source,
         Err(err) => {
@@ -229,9 +262,9 @@ fn announce(ctx: Context, channel_id: ChannelId, guild_id: GuildId, name: String
             return;
         }
     };
-    handler.play(source);
 
-    info!("Playing sound file for {}", name);
+    info!("Playing sound file {}", path);
+    handler.play(source);
 }
 
 fn voice_channel_is_empty(ctx: &Context, guild: Guild, channel_id: ChannelId) -> bool {
