@@ -4,6 +4,7 @@ extern crate log;
 extern crate env_logger;
 extern crate serenity;
 
+use serenity::model::id::UserId;
 use std::{
     env, 
     fs, 
@@ -125,13 +126,16 @@ impl EventHandler for Handler {
             }
         };
 
+        const USER1_ID: UserId = UserId(239705630913331201);
+        const USER2_ID: UserId = UserId(180995420196044809);
+
         if old_state.is_none() {
-            if user_id == 239705630913331201 {
+            if user_id == USER1_ID {
                 let mut user_check = guild
                                     .voice_states
                                     .values()
                                     .filter(|state| state.channel_id == Some(channel_id))
-                                    .filter(|state| state.user_id == 180995420196044809)
+                                    .filter(|state| state.user_id == USER2_ID)
                                     .peekable();
                     
                 if user_check.peek().is_some() {
@@ -140,12 +144,12 @@ impl EventHandler for Handler {
                 }
             }
 
-            if user_id == 180995420196044809 {
+            if user_id == USER2_ID {
                 let mut user_check = guild
                                     .voice_states
                                     .values()
                                     .filter(|state| state.channel_id == Some(channel_id))
-                                    .filter(|state| state.user_id == 239705630913331201)
+                                    .filter(|state| state.user_id == USER1_ID)
                                     .peekable();
                     
                 if user_check.peek().is_some() {
