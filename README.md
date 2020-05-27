@@ -1,7 +1,7 @@
 
 
 # Announcer Bot
-[![License](https://img.shields.io/badge/license-GPL-lightgrey.svg)](https://opensource.org/licenses/gpl-license) [![Discord Server](https://discordapp.com/api/guilds/518113399448666113/embed.png)](https://discord.gg/qPxJfWw)
+[![Build Status](https://img.shields.io/travis/sasjafor/Announcer-Bot?style=flat-square)](https://travis-ci.org/sasjafor/Announcer-Bot) [![License](https://img.shields.io/badge/license-GPL-lightgrey.svg?style=flat-square)](https://opensource.org/licenses/gpl-license) [![Discord Server](https://img.shields.io/discord/518113399448666113.svg?style=flat-square&colorB=7289DA)](https://discord.gg/qPxJfWw)
 
 A simple Discord bot that announces users joining a voice channel or unmuting themselves.
 
@@ -20,10 +20,3 @@ Custom audio files can be submitted in a text channel named "announcer-bot-submi
 If no name is provided, the name of the file is used, but any underscores are replaced with spaces.
 
 The audio files are stored in /config/audio because the bot is intended to be used within a docker container.
-
-[crates.io link]: https://crates.io/crates/serenity
-[crates.io version]: https://img.shields.io/crates/v/serenity.svg?style=flat-square
-[guild]: https://discord.gg/WBdGJCc
-[guild-badge]: https://img.shields.io/discord/381880193251409931.svg?style=flat-square&colorB=7289DA
-[rust 1.31.1+ badge]: https://img.shields.io/badge/rust-1.31.1+-93450a.svg?style=flat-square
-[rust 1.31.1+ link]: https://blog.rust-lang.org/2018/12/20/Rust-1.31.1.html
