@@ -3,8 +3,13 @@ extern crate log;
 
 extern crate env_logger;
 extern crate serenity;
+extern crate url;
+extern crate chrono;
 
-use serenity::model::id::UserId;
+use chrono::{NaiveTime};
+use url::{Url};
+use serenity::prelude::TypeMapKey;
+use serenity::prelude::Mutex;
 use std::{
     env, 
     fs, 
@@ -39,15 +44,16 @@ use serenity::{
         event::ResumedEvent, 
         gateway::Ready, 
         guild::Guild, 
-        id::ChannelId, 
-        id::GuildId,
-        prelude::Message,
+        id::{
+            ChannelId,
+            GuildId,
+            UserId,
+        }, 
+        prelude::*,
         voice::VoiceState,
     },
     voice,
 };
-
-use serenity::prelude::*;
 
 struct VoiceManager;
 
@@ -316,11 +322,23 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
             return Ok(());
         }
     };
-    if channel_name == "announcer-bot-submissions" {
+
+    if channel_name != "announcer-bot-submissions" {
+        debug!("command used in wrong channel");
+        return Ok(())
+    }
+
+    let arguments = args.raw_quoted().collect::<Vec<&str>>();
+
+    let name: &str = arguments[0];
+    let filename: String;
+    let content;
+
+    if arguments.len() == 1 {
         let attachments = &message.attachments;
         if !attachments.is_empty() {
             let audio_file = &attachments[0];
-            let content = match audio_file.download() {
+            content = match audio_file.download() {
                 Ok(content) => content,
                 Err(why) => {
                     error!("Error downloading attachment: {:?}", why);
@@ -329,9 +347,6 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
                 }
             };
 
-            let name: &str = args.rest();
-
-            let filename: String;
             if name.is_empty() {
                 filename = audio_file.filename.to_owned();
             } else {
@@ -349,46 +364,114 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
 
             if let Err(why) = file.write(&content) {
                 error!("Error writing to file: {:?}", why);
+                let _ = message.channel_id.say(ctx, "Error writing file");
                 return Ok(());
             }
-
-            // normalise the audio file
-            let _normalise = Command::new("ffmpeg-normalize")
-                .arg("-f")
-                .arg("-c:a")
-                .arg("libmp3lame")
-                .arg("-b:a")
-                .arg("128K")
-                .arg(&filename)
-                .arg("-o")
-                .arg(&filename)
-                .current_dir("/config/audio")
-                .output()
-                .expect("Failed to run ffmpeg-normalize");
-
-            // trim length to 5s
-            let _trim = Command::new("ffmpeg")
-                .arg("-i")
-                .arg(&filename)
-                .arg("-t")
-                .arg("00:00:06")
-                .arg(filename.to_owned() + "tmp.wav")
-                .current_dir("/config/audio")
-                .output()
-                .expect("Failed to shorten length with ffmpeg");
-
-            fs::rename(
-                "/config/audio/".to_owned() + &filename + "tmp.wav",
-                "/config/audio/".to_owned() + &filename,
-            )?;
-
-            let text_path = "/config/queue/".to_owned() + &name;
-
-            fs::remove_file(text_path)?;
         } else {
             let _ = message.channel_id.say(&ctx, "Please attach an audio file");
+            return Ok(())
         }
+    } else {
+        let url = arguments[1];
+        let _ = Url::parse(url)?;
+
+        let start = arguments[2];
+        let start_parsed = NaiveTime::parse_from_str(start, "%H:%M:%S")?;
+        let end = arguments[3];
+        let end_parsed = NaiveTime::parse_from_str(end, "%H:%M:%S")?;
+
+        let youtube_url = Command::new("youtube-dl")
+            .arg("-g")
+            .arg(url)
+            .output()
+            .expect("Failed to run youtube-dl");
+
+        if !youtube_url.status.success() {
+            error!("Error for youtube url {}", url);
+            let _ = message.channel_id.say(ctx, "Youtube url error");
+            return Ok(())
+        }
+
+        let youtube_dloutput = String::from_utf8(youtube_url.stdout)?;
+        let lines = youtube_dloutput.lines();
+
+        let audio_url = match lines.last() {
+            Some(line) => line,
+            None => {
+                error!("Empty info for {}", url);
+                let _ = message.channel_id.say(ctx, "Youtube emtpy info");
+                return Ok(())
+            }
+        };
+
+        filename = name.to_owned() + ".wav";
+
+        let _download = Command::new("ffmpeg")
+            .arg("-ss")
+            .arg(start_parsed.to_string())
+            .arg("-i")
+            .arg(audio_url)
+            .arg("-t")
+            .arg(end_parsed.to_string())
+            .arg("-vn")
+            .arg("-f")
+            .arg("wav")
+            .arg(&filename)
+            .current_dir("/config/audio")
+            .output()
+            .expect("Failed to run ffmpeg to cut audio");
     }
 
+    // normalise the audio file
+    let _normalise = Command::new("ffmpeg-normalize")
+        .arg("-f")
+        .arg("-c:a")
+        .arg("libmp3lame")
+        .arg("-b:a")
+        .arg("128K")
+        .arg(&filename)
+        .arg("-o")
+        .arg(&filename)
+        .current_dir("/config/audio")
+        .output()
+        .expect(&format!("Failed to run ffmpeg-normalize {}", filename));
+
+    // trim length to 5s
+    let _trim = Command::new("ffmpeg")
+        .arg("-i")
+        .arg(&filename)
+        .arg("-t")
+        .arg("00:00:06")
+        .arg(filename.to_owned() + "tmp.wav")
+        .current_dir("/config/audio")
+        .output()
+        .expect("Failed to shorten length with ffmpeg");
+
+    fs::rename(
+        "/config/audio/".to_owned() + &filename + "tmp.wav",
+        "/config/audio/".to_owned() + &filename,
+    )?;
+
+    let text_path = "/config/queue/".to_owned() + &name;
+
+    fs::remove_file(text_path)?;
+
+    let _ = message.channel_id.say(&ctx, format!("Successfully added new file for {}", name));
     Ok(())
 }
+
+// #[command]
+// pub fn newfileyt(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
+//     let channel_name = match message.channel_id.name(&ctx) {
+//         Some(name) => name,
+//         None => {
+//             debug!("No channel name found");
+//             return Ok(());
+//         }
+//     };
+//     if channel_name == "announcer-bot-submissions" {
+
+//     }
+
+//     Ok(())
+// }
