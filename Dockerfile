@@ -18,6 +18,10 @@ RUN apt-get update && \
                                                 && \
     mkdir /config
 
+# Install youtube-dl
+RUN wget https://yt-dl.org/downloads/latest/youtube-dl -O /usr/local/bin/youtube-dl && \
+    chmod a+rx /usr/local/bin/youtube-dl
+
 # Install ffmpeg-normalize
 RUN pip3 install ffmpeg-normalize
 
