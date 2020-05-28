@@ -341,8 +341,8 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
             content = match audio_file.download() {
                 Ok(content) => content,
                 Err(why) => {
-                    error!("Error downloading attachment: {:?}", why);
                     let _ = message.channel_id.say(&ctx, "Error downloading attachment");
+                    error!("Error downloading attachment: {:?}", why);
                     return Ok(());
                 }
             };
@@ -356,15 +356,15 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
             let mut file = match File::create("/config/audio/".to_owned() + &filename) {
                 Ok(file) => file,
                 Err(why) => {
+                    let _ = message.channel_id.say(&ctx, "Error creating file");
                     error!("Error creating file: {:?}", why);
-                    let _ = message.channel_id.say(ctx, "Error creating file");
                     return Ok(());
                 }
             };
 
             if let Err(why) = file.write(&content) {
+                let _ = message.channel_id.say(&ctx, "Error writing file");
                 error!("Error writing to file: {:?}", why);
-                let _ = message.channel_id.say(ctx, "Error writing file");
                 return Ok(());
             }
         } else {
@@ -373,40 +373,74 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         }
     } else {
         let url = arguments[1];
-        let _ = Url::parse(url)?;
+        let _ = match Url::parse(url) {
+            Ok(url) => url,
+            Err(why) => {
+                let _ = message.channel_id.say(&ctx, "Please provide a valid url");
+                debug!("Invalid url: {}", why);
+                return Ok(());
+            }
+        };
 
         let start = arguments[2];
-        let start_parsed = NaiveTime::parse_from_str(start, "%H:%M:%S")?;
+        let start_parsed = match NaiveTime::parse_from_str(start, "%H:%M:%S") {
+            Ok(time) => time,
+            Err(why) => {
+                let _ = message.channel_id.say(&ctx, "Please provide a valid start time, e.g. 00:00:15");
+                debug!("Invalid start time: {}", why);
+                return Ok(());
+            }
+        };
         let end = arguments[3];
-        let end_parsed = NaiveTime::parse_from_str(end, "%H:%M:%S")?;
+        let end_parsed = match NaiveTime::parse_from_str(end, "%H:%M:%S") {
+            Ok(time) => time,
+            Err(why) => {
+                let _ = message.channel_id.say(&ctx, "Please provide a valid duration, e.g. 00:00:06");
+                debug!("Invalid duration: {}", why);
+                return Ok(());
+            }
+        };
 
-        let youtube_url = Command::new("youtube-dl")
+        let youtube_url = match Command::new("youtube-dl")
             .arg("-g")
             .arg(url)
-            .output()
-            .expect("Failed to run youtube-dl");
+            .output() {
+                Ok(res) => res,
+                Err(why) => {
+                    let _ = message.channel_id.say(&ctx, "Failed to run youtube-dl");
+                    error!("Failed to run youtube-dl: {}", why);
+                    return Ok(())
+                }
+            };
 
         if !youtube_url.status.success() {
+            let _ = message.channel_id.say(&ctx, "Youtube url error");
             error!("Error for youtube url {}", url);
-            let _ = message.channel_id.say(ctx, "Youtube url error");
             return Ok(())
         }
 
-        let youtube_dloutput = String::from_utf8(youtube_url.stdout)?;
+        let youtube_dloutput = match String::from_utf8(youtube_url.stdout) {
+            Ok(res) => res,
+            Err(why) => {
+                let _ = message.channel_id.say(&ctx, "Failed to parse youtube-dl output");
+                error!("Failed to parse youtube-dl output {}", why);
+                return Ok(())
+            }
+        };
         let lines = youtube_dloutput.lines();
 
         let audio_url = match lines.last() {
             Some(line) => line,
             None => {
+                let _ = message.channel_id.say(&ctx, "Youtube emtpy info");
                 error!("Empty info for {}", url);
-                let _ = message.channel_id.say(ctx, "Youtube emtpy info");
                 return Ok(())
             }
         };
 
         filename = name.to_owned() + ".wav";
 
-        let _download = Command::new("ffmpeg")
+        let _download = match Command::new("ffmpeg")
             .arg("-ss")
             .arg(start_parsed.to_string())
             .arg("-i")
@@ -418,12 +452,18 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
             .arg("wav")
             .arg(&filename)
             .current_dir("/config/audio")
-            .output()
-            .expect("Failed to run ffmpeg to cut audio");
+            .output() {
+                Ok(res) => res,
+                Err(why) => {
+                    let _ = message.channel_id.say(&ctx, "Failed to download from youtube");
+                    error!("Failed to run ffmpeg to cut audio: {}", why);
+                    return Ok(());
+                }
+            };
     }
 
     // normalise the audio file
-    let _normalise = Command::new("ffmpeg-normalize")
+    let _normalise = match Command::new("ffmpeg-normalize")
         .arg("-f")
         .arg("-c:a")
         .arg("libmp3lame")
@@ -433,45 +473,53 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         .arg("-o")
         .arg(&filename)
         .current_dir("/config/audio")
-        .output()
-        .expect(&format!("Failed to run ffmpeg-normalize {}", filename));
+        .output() {
+                Ok(res) => res,
+                Err(why) => {
+                    let _ = message.channel_id.say(&ctx, "Failed to normalise audio");
+                    error!("Failed to run ffmpeg-normalize for file {} ERROR: {}", &filename, why);
+                    return Ok(());
+                }
+            };
 
     // trim length to 5s
-    let _trim = Command::new("ffmpeg")
+    let _trim = match Command::new("ffmpeg")
         .arg("-i")
         .arg(&filename)
         .arg("-t")
         .arg("00:00:06")
         .arg(filename.to_owned() + "tmp.wav")
         .current_dir("/config/audio")
-        .output()
-        .expect("Failed to shorten length with ffmpeg");
+        .output() {
+                Ok(res) => res,
+                Err(why) => {
+                    let _ = message.channel_id.say(&ctx, "Failed to shorten length with ffmpeg");
+                    error!("Failed to shorten length with ffmpeg for file {} ERROR: {}", &filename, why);
+                    return Ok(());
+                }
+            };
 
-    fs::rename(
+    let _ = match fs::rename(
         "/config/audio/".to_owned() + &filename + "tmp.wav",
         "/config/audio/".to_owned() + &filename,
-    )?;
+    ) {
+        Ok(res) => res,
+        Err(why) => {
+            let _ = message.channel_id.say(&ctx, "Failed to rename file");
+            error!("Failed to rename file {} ERROR: {}", &filename, why);
+            return Ok(());
+        }
+    };
 
     let text_path = "/config/queue/".to_owned() + &name;
 
-    fs::remove_file(text_path)?;
+    let _ = match fs::remove_file(&text_path) {
+        Ok(res) => res,
+        Err(why) => {
+            debug!("Failed to remove queue file {} ERROR: {}", &text_path, why);
+        }
+    };
 
     let _ = message.channel_id.say(&ctx, format!("Successfully added new file for {}", name));
     Ok(())
 }
-
-// #[command]
-// pub fn newfileyt(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
-//     let channel_name = match message.channel_id.name(&ctx) {
-//         Some(name) => name,
-//         None => {
-//             debug!("No channel name found");
-//             return Ok(());
-//         }
-//     };
-//     if channel_name == "announcer-bot-submissions" {
-
-//     }
-
-//     Ok(())
-// }
