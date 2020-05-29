@@ -332,6 +332,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
 
     let name: &str = arguments[0];
     let filename: String;
+    let tmp_filename: String;
     let content;
 
     if arguments.len() == 1 {
@@ -350,8 +351,9 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
             if name.is_empty() {
                 filename = audio_file.filename.to_owned();
             } else {
-                filename = name.to_owned() + ".wav";
-            }
+                filename = format!("{}{}", &name, ".wav");
+            }            
+            tmp_filename = format!("{}{}", &filename, ".tmp.wav");
 
             let mut file = match File::create("/config/audio/".to_owned() + &filename) {
                 Ok(file) => file,
@@ -432,13 +434,14 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         let audio_url = match lines.last() {
             Some(line) => line,
             None => {
-                let _ = message.channel_id.say(&ctx, "Youtube emtpy info");
+                let _ = message.channel_id.say(&ctx, "Youtube empty info");
                 error!("Empty info for {}", url);
                 return Ok(())
             }
         };
 
-        filename = name.to_owned() + ".wav";
+        filename = format!("{}{}", &name, ".wav");
+        tmp_filename = format!("{}{}", &filename, ".tmp.wav");
 
         let _download = match Command::new("ffmpeg")
             .arg("-ss")
@@ -450,7 +453,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
             .arg("-vn")
             .arg("-f")
             .arg("wav")
-            .arg(&filename)
+            .arg(&tmp_filename)
             .current_dir("/config/audio")
             .output() {
                 Ok(res) => res,
@@ -469,9 +472,9 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         .arg("libmp3lame")
         .arg("-b:a")
         .arg("128K")
-        .arg(&filename)
+        .arg(&tmp_filename)
         .arg("-o")
-        .arg(&filename)
+        .arg(&tmp_filename)
         .current_dir("/config/audio")
         .output() {
                 Ok(res) => res,
@@ -485,10 +488,10 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
     // trim length to 5s
     let _trim = match Command::new("ffmpeg")
         .arg("-i")
-        .arg(&filename)
+        .arg(&tmp_filename)
         .arg("-t")
         .arg("00:00:06")
-        .arg(filename.to_owned() + "tmp.wav")
+        .arg(&tmp_filename)
         .current_dir("/config/audio")
         .output() {
                 Ok(res) => res,
@@ -500,7 +503,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
             };
 
     let _ = match fs::rename(
-        "/config/audio/".to_owned() + &filename + "tmp.wav",
+        "/config/audio/".to_owned() + &tmp_filename,
         "/config/audio/".to_owned() + &filename,
     ) {
         Ok(res) => res,
