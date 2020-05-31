@@ -385,23 +385,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         };
 
         let start = arguments[2];
-        let start_parsed = match NaiveTime::parse_from_str(start, "%H:%M:%S") {
-            Ok(time) => time,
-            Err(why) => {
-                let _ = message.channel_id.say(&ctx, "Please provide a valid start time, e.g. 00:00:15");
-                debug!("Invalid start time: {}", why);
-                return Ok(());
-            }
-        };
-        let end = arguments[3];
-        let end_parsed = match NaiveTime::parse_from_str(end, "%H:%M:%S") {
-            Ok(time) => time,
-            Err(why) => {
-                let _ = message.channel_id.say(&ctx, "Please provide a valid duration, e.g. 00:00:06");
-                debug!("Invalid duration: {}", why);
-                return Ok(());
-            }
-        };
+        let duration = arguments[3];
 
         let youtube_url = match Command::new("youtube-dl")
             .arg("-g")
@@ -445,11 +429,11 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
 
         let _download = match Command::new("ffmpeg")
             .arg("-ss")
-            .arg(start_parsed.to_string())
+            .arg(start.to_string())
             .arg("-i")
             .arg(audio_url)
             .arg("-t")
-            .arg(end_parsed.to_string())
+            .arg(duration.to_string())
             .arg("-vn")
             .arg("-f")
             .arg("wav")
