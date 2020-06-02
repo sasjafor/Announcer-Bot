@@ -4,9 +4,7 @@ extern crate log;
 extern crate env_logger;
 extern crate serenity;
 extern crate url;
-extern crate chrono;
 
-use chrono::{NaiveTime};
 use url::{Url};
 use serenity::prelude::TypeMapKey;
 use serenity::prelude::Mutex;
@@ -216,6 +214,7 @@ fn main() {
 
     let audio = Path::new("/config/audio");
     let queue = Path::new("/config/queue");
+    let processing = Path::new("/config/processing/");
 
     if !audio.exists() {
         let _ = fs::create_dir(audio);
@@ -223,6 +222,10 @@ fn main() {
 
     if !queue.exists() {
         let _ = fs::create_dir(queue);
+    }
+
+    if !processing.exists() {
+        let _ = fs::create_dir(processing);
     }
 
     // start listening for events by starting a single shard
@@ -233,7 +236,7 @@ fn main() {
 
 fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, name: &str) {
     debug!("Joined {}", channel_id.mention());
-    let path = "/config/audio/".to_owned() + &name + ".wav";
+    let path = format!("{}{}{}", "/config/audio/", &name, ".wav");
 
     check_path(&path, &name);
 
@@ -307,7 +310,7 @@ fn check_path(path: &str, name: &str) {
             .arg(name)
             .output()
             .expect("Failed to run espeak!");
-        let text_path = "/config/queue/".to_owned() + &name;
+        let text_path = format!("{}{}", "/config/queue/", &name);
 
         fs::write(text_path, name).expect("Unable to write file");
     }
@@ -330,16 +333,22 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
 
     let arguments = args.raw_quoted().collect::<Vec<&str>>();
 
-    let name: &str = arguments[0];
-    let filename: String;
-    let tmp_filename: String;
-    let content;
+    let name = match arguments.first() {
+        Some(name) => name,
+        None => {
+            let _ = message.channel_id.say(&ctx, "Please provide a name");
+            return Ok(());
+        }
+    };
+    let filename = format!("{}{}", &name, ".wav");
+    let processing_path = "/config/processing/";
+    let audio_path = "/config/audio/";
 
-    if arguments.len() == 1 {
+    if arguments.len() <= 2 {
         let attachments = &message.attachments;
         if !attachments.is_empty() {
             let audio_file = &attachments[0];
-            content = match audio_file.download() {
+            let content = match audio_file.download() {
                 Ok(content) => content,
                 Err(why) => {
                     let _ = message.channel_id.say(&ctx, "Error downloading attachment");
@@ -348,14 +357,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
                 }
             };
 
-            if name.is_empty() {
-                filename = audio_file.filename.to_owned();
-            } else {
-                filename = format!("{}{}", &name, ".wav");
-            }            
-            tmp_filename = format!("{}{}", &filename, ".tmp.wav");
-
-            let mut file = match File::create("/config/audio/".to_owned() + &filename) {
+            let mut file = match File::create(format!("{}{}", processing_path, &filename)) {
                 Ok(file) => file,
                 Err(why) => {
                     let _ = message.channel_id.say(&ctx, "Error creating file");
@@ -387,17 +389,11 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         let start = arguments[2];
         let duration = arguments[3];
 
-        let youtube_url = match Command::new("youtube-dl")
+        let youtube_url = Command::new("youtube-dl")
             .arg("-g")
             .arg(url)
-            .output() {
-                Ok(res) => res,
-                Err(why) => {
-                    let _ = message.channel_id.say(&ctx, "Failed to run youtube-dl");
-                    error!("Failed to run youtube-dl: {}", why);
-                    return Ok(())
-                }
-            };
+            .output()
+            .expect("Failed to run youtube-dl");
 
         if !youtube_url.status.success() {
             let _ = message.channel_id.say(&ctx, "Youtube url error");
@@ -424,10 +420,8 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
             }
         };
 
-        filename = format!("{}{}", &name, ".wav");
-        tmp_filename = format!("{}{}", &filename, ".tmp.wav");
-
-        let _download = match Command::new("ffmpeg")
+        let download_status = Command::new("ffmpeg")
+            .arg("-y")
             .arg("-ss")
             .arg(start.to_string())
             .arg("-i")
@@ -437,73 +431,149 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
             .arg("-vn")
             .arg("-f")
             .arg("wav")
-            .arg(&tmp_filename)
-            .current_dir("/config/audio")
-            .output() {
-                Ok(res) => res,
-                Err(why) => {
-                    let _ = message.channel_id.say(&ctx, "Failed to download from youtube");
-                    error!("Failed to run ffmpeg to cut audio: {}", why);
-                    return Ok(());
-                }
-            };
+            .arg(&filename)
+            .current_dir(&processing_path)
+            .output()
+            .expect("failed to run ffmpeg")
+            .status;
+        
+        if !download_status.success() {
+            let _ = message.channel_id.say(&ctx, "Failed to download from youtube");
+            error!("Failed to run ffmpeg to download audio for file {}; CODE: {}", &filename, download_status.code().expect("no exit code"));
+            return Ok(());
+        }
+    }
+
+    let filter_filename = format!("{}{}", &name, ".filter.wav");
+    let normalise_filename = format!("{}{}", &name, ".normalise.wav");
+    let trim_filename = format!("{}{}", &name, ".trim.wav");
+
+    if arguments.len() == 2 || arguments.len() == 5 {
+        let filter_string = match arguments.last() {
+            Some(filter) => filter,
+            None =>  {
+                error!("There was no argument when there should be!");
+                return Ok(());
+            }
+        };
+
+        let filter_status = Command::new("ffmpeg")
+            .arg("-y")
+            .arg("-i")
+            .arg(&filename)
+            .arg("-filter:a")
+            .arg(&filter_string)
+            .arg("-f")
+            .arg("wav")
+            .arg(&filter_filename)
+            .current_dir(&processing_path)
+            .output()
+            .expect("Failed to run ffmpeg")
+            .status;
+        
+        if !filter_status.success() {
+            let _ = message.channel_id.say(&ctx, "Failed to apply audio filter");
+            error!("Failed to apply audio effect for file {}; CODE: {}", &filename, filter_status.code().expect("no exit code"));
+            return Ok(());
+        }
+
+    } else {
+        let _ = match fs::copy(
+            format!("{}{}", &processing_path, &filename),
+            format!("{}{}", &audio_path, &filter_filename),
+        ) {
+            Ok(res) => res,
+            Err(why) => {
+                let _ = message.channel_id.say(&ctx, "Failed to copy file");
+                error!("Failed to copy file {} ERROR: {}", &filename, why);
+                return Ok(());
+            }
+        };
     }
 
     // normalise the audio file
-    let _normalise = match Command::new("ffmpeg-normalize")
+    let normalise_status = Command::new("ffmpeg-normalize")
         .arg("-f")
         .arg("-c:a")
         .arg("libmp3lame")
         .arg("-b:a")
         .arg("128K")
-        .arg(&tmp_filename)
+        .arg(&filter_filename)
         .arg("-o")
-        .arg(&tmp_filename)
-        .current_dir("/config/audio")
-        .output() {
-                Ok(res) => res,
-                Err(why) => {
-                    let _ = message.channel_id.say(&ctx, "Failed to normalise audio");
-                    error!("Failed to run ffmpeg-normalize for file {} ERROR: {}", &filename, why);
-                    return Ok(());
-                }
-            };
+        .arg(&normalise_filename)
+        .current_dir(&processing_path)
+        .output()
+        .expect("Failed to run ffmpeg-normalize")
+        .status;
+
+    if !normalise_status.success()
+    {
+        let _ = message.channel_id.say(&ctx, "Failed to normalise audio");
+        error!("Failed to run ffmpeg-normalize for file {} CODE: {}", &filename, normalise_status.code().expect("no exit code"));
+        return Ok(());
+    }
 
     // trim length to 5s
-    let _trim = match Command::new("ffmpeg")
+    let trim_status = Command::new("ffmpeg")
+        .arg("-y")
         .arg("-i")
-        .arg(&tmp_filename)
+        .arg(&normalise_filename)
         .arg("-t")
         .arg("00:00:06")
-        .arg(&tmp_filename)
-        .current_dir("/config/audio")
-        .output() {
-                Ok(res) => res,
-                Err(why) => {
-                    let _ = message.channel_id.say(&ctx, "Failed to shorten length with ffmpeg");
-                    error!("Failed to shorten length with ffmpeg for file {} ERROR: {}", &filename, why);
-                    return Ok(());
-                }
-            };
+        .arg("-f")
+        .arg("wav")
+        .arg(&trim_filename)
+        .current_dir(&processing_path)
+        .output() 
+        .expect("Failed to run fmmpeg")
+        .status;
+
+    if !trim_status.success()
+    {
+        let _ = message.channel_id.say(&ctx, "Failed to shorten length with ffmpeg");
+        error!("Failed to shorten length with ffmpeg for file {} ERROR: {}", &filename, trim_status.code().expect("no exit code"));
+        return Ok(());
+    };
 
     let _ = match fs::rename(
-        "/config/audio/".to_owned() + &tmp_filename,
-        "/config/audio/".to_owned() + &filename,
+        format!("{}{}", &processing_path, &trim_filename),
+        format!("{}{}", &audio_path, &filename),
     ) {
         Ok(res) => res,
         Err(why) => {
             let _ = message.channel_id.say(&ctx, "Failed to rename file");
-            error!("Failed to rename file {} ERROR: {}", &filename, why);
+            error!("Failed to rename file {} ERROR: {}", &trim_filename, why);
             return Ok(());
         }
     };
 
-    let text_path = "/config/queue/".to_owned() + &name;
+    let text_path = format!("{}{}", "/config/queue/", &name);
 
     let _ = match fs::remove_file(&text_path) {
         Ok(res) => res,
         Err(why) => {
             debug!("Failed to remove queue file {} ERROR: {}", &text_path, why);
+        }
+    };
+
+    let _ = match fs::remove_file(format!("{}{}", &processing_path, &filename)) {
+        Ok(res) => res,
+        Err(why) => {
+            debug!("Failed to remove queue file {} ERROR: {}", &filename, why);
+        }
+    };
+
+    let _ = match fs::remove_file(format!("{}{}", &processing_path, &filter_filename)) {
+        Ok(res) => res,
+        Err(why) => {
+            debug!("Failed to remove queue file {} ERROR: {}", &filter_filename, why);
+        }
+    };
+
+    let _ = match fs::remove_file(format!("{}{}", &processing_path, &normalise_filename)) {
+        Ok(res) => res,
+        Err(why) => {
+            debug!("Failed to remove queue file {} ERROR: {}", &normalise_filename, why);
         }
     };
 
