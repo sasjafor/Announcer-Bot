@@ -4,7 +4,6 @@ FROM rust:1.43
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 
 # Setup apt, install package dependencies and create /config
-# RUN echo "deb http://ftp.debian.org/debian jessie-backports main" >> /etc/apt/sources.list && \
 RUN apt-get update && \
     apt-get install -y --no-install-recommends  espeak \
                                                 ffmpeg \
@@ -17,10 +16,6 @@ RUN apt-get update && \
                                                 vorbis-tools \
                                                 && \
     mkdir /config
-
-# Install youtube-dl
-# RUN wget https://yt-dl.org/downloads/latest/youtube-dl -O /usr/local/bin/youtube-dl && \
-#     chmod a+rx /usr/local/bin/youtube-dl
 
 # Install ffmpeg-normalize
 RUN pip3 install ffmpeg-normalize
@@ -56,8 +51,8 @@ RUN mv ./target/release/announcer_bot /bin && \
 
 WORKDIR /
 
+# Install youtube-dl
 ADD https://yt-dl.org/downloads/latest/youtube-dl /usr/local/bin/
-
 RUN chmod a+rx /usr/local/bin/youtube-dl
 
 # EXPOSE 8080
