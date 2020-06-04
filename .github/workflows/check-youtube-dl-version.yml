@@ -9,6 +9,8 @@ jobs:
       - uses: actions/checkout@v2
         with:
           token: ${{ secrets.REPO_SCOPED_TOKEN }}
+        env:
+          DOCKER_BUILD_TRIGGER: ${{ secrets.DOCKER_BUILD_TRIGGER_URL }}
       - name: Fetch release version
         run: |
           curl -sL https://api.github.com/repos/ytdl-org/youtube-dl/releases/latest | \
@@ -23,5 +25,5 @@ jobs:
           git config --global user.email 'sascha.forster@hotmail.ch'
           git commit -am "New release version"
           git push
-          curl -X POST https://hub.docker.com/api/build/v1/source/ea8bc9b3-f0c8-4df9-905e-7a25213f7312/trigger/20bca522-9907-4ab3-8824-2aefcb5a25b9/call/
+          curl -X POST "$DOCKER_BUILD_TRIGGER"
         
