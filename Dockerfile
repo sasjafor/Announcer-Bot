@@ -19,8 +19,8 @@ RUN apt-get update && \
     mkdir /config
 
 # Install youtube-dl
-RUN wget https://yt-dl.org/downloads/latest/youtube-dl -O /usr/local/bin/youtube-dl && \
-    chmod a+rx /usr/local/bin/youtube-dl
+# RUN wget https://yt-dl.org/downloads/latest/youtube-dl -O /usr/local/bin/youtube-dl && \
+#     chmod a+rx /usr/local/bin/youtube-dl
 
 # Install ffmpeg-normalize
 RUN pip3 install ffmpeg-normalize
@@ -30,15 +30,15 @@ RUN USER=root cargo new --bin announcer_bot
 
 WORKDIR /announcer_bot
 
+# Set log level
+ENV RUST_LOG warn
+
 # Copy manifest
 COPY ./Cargo.toml ./Cargo.toml
 
 # Build dependencies
 RUN cargo build --release
 RUN rm src/*.rs
-
-# Set log level
-ENV RUST_LOG warn
 
 # Copy run script
 COPY src/run /bin
@@ -55,6 +55,10 @@ RUN mv ./target/release/announcer_bot /bin && \
     rm -rf /announcer_bot
 
 WORKDIR /
+
+ADD https://yt-dl.org/downloads/latest/youtube-dl /usr/local/bin/
+
+RUN chmod a+rx /usr/local/bin/youtube-dl
 
 # EXPOSE 8080
 VOLUME /config

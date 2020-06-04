@@ -1,13 +1,13 @@
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate lazy_static;
 
 extern crate env_logger;
 extern crate serenity;
 extern crate url;
+extern crate regex;
 
-use url::{Url};
-use serenity::prelude::TypeMapKey;
-use serenity::prelude::Mutex;
 use std::{
     env, 
     fs, 
@@ -18,6 +18,7 @@ use std::{
     sync::{
         Arc,
     },
+    time::Duration,
 };
 
 use serenity::{
@@ -50,8 +51,15 @@ use serenity::{
         prelude::*,
         voice::VoiceState,
     },
+    prelude::{
+        TypeMapKey,
+        Mutex,
+    },
     voice,
 };
+
+use regex::Regex;
+use url::{Url};
 
 struct VoiceManager;
 
@@ -179,7 +187,7 @@ impl EventHandler for Handler {
 
             let name = member.display_name().to_string();
 
-            announce(&ctx, channel_id, guild_id, &name);
+            let _ = announce(&ctx, channel_id, guild_id, &name);
             return;
         }
     }
@@ -389,6 +397,14 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         let start = arguments[2];
         let duration = arguments[3];
 
+        let duration_parsed = parse_duration(duration).unwrap();
+
+        if duration_parsed > Duration::from_secs(7) {
+            let _ = message.channel_id.say(&ctx, "Duration too long");
+            debug!("Duration is too long {}", duration);
+            return Ok(())
+        }
+
         let youtube_url = Command::new("youtube-dl")
             .arg("-g")
             .arg(url)
@@ -424,10 +440,10 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
             .arg("-y")
             .arg("-ss")
             .arg(start.to_string())
-            .arg("-i")
-            .arg(audio_url)
             .arg("-t")
             .arg(duration.to_string())
+            .arg("-i")
+            .arg(audio_url)
             .arg("-vn")
             .arg("-f")
             .arg("wav")
@@ -473,6 +489,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         
         if !filter_status.success() {
             let _ = message.channel_id.say(&ctx, "Failed to apply audio filter");
+            let _ = delete_processing_files(&processing_path, &filename, &filter_filename, &normalise_filename);
             error!("Failed to apply audio effect for file {}; CODE: {}", &filename, filter_status.code().expect("no exit code"));
             return Ok(());
         }
@@ -480,11 +497,12 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
     } else {
         let _ = match fs::copy(
             format!("{}{}", &processing_path, &filename),
-            format!("{}{}", &audio_path, &filter_filename),
+            format!("{}{}", &processing_path, &filter_filename),
         ) {
             Ok(res) => res,
             Err(why) => {
                 let _ = message.channel_id.say(&ctx, "Failed to copy file");
+                let _ = delete_processing_files(&processing_path, &filename, &filter_filename, &normalise_filename);
                 error!("Failed to copy file {} ERROR: {}", &filename, why);
                 return Ok(());
             }
@@ -509,6 +527,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
     if !normalise_status.success()
     {
         let _ = message.channel_id.say(&ctx, "Failed to normalise audio");
+        let _ = delete_processing_files(&processing_path, &filename, &filter_filename, &normalise_filename);
         error!("Failed to run ffmpeg-normalize for file {} CODE: {}", &filename, normalise_status.code().expect("no exit code"));
         return Ok(());
     }
@@ -516,10 +535,10 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
     // trim length to 5s
     let trim_status = Command::new("ffmpeg")
         .arg("-y")
-        .arg("-i")
-        .arg(&normalise_filename)
         .arg("-t")
         .arg("00:00:06")
+        .arg("-i")
+        .arg(&normalise_filename)
         .arg("-f")
         .arg("wav")
         .arg(&trim_filename)
@@ -531,6 +550,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
     if !trim_status.success()
     {
         let _ = message.channel_id.say(&ctx, "Failed to shorten length with ffmpeg");
+        let _ = delete_processing_files(&processing_path, &filename, &filter_filename, &normalise_filename);
         error!("Failed to shorten length with ffmpeg for file {} ERROR: {}", &filename, trim_status.code().expect("no exit code"));
         return Ok(());
     };
@@ -542,6 +562,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         Ok(res) => res,
         Err(why) => {
             let _ = message.channel_id.say(&ctx, "Failed to rename file");
+            let _ = delete_processing_files(&processing_path, &filename, &filter_filename, &normalise_filename);
             error!("Failed to rename file {} ERROR: {}", &trim_filename, why);
             return Ok(());
         }
@@ -556,6 +577,64 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         }
     };
 
+    let _ = delete_processing_files(&processing_path, &filename, &filter_filename, &normalise_filename);
+
+    let _ = message.channel_id.say(&ctx, format!("Successfully added new file for {}", name));
+    Ok(())
+}
+
+fn parse_duration(input: &str) -> Result<Duration, &str> {
+    lazy_static! {
+        static ref RE: Regex = Regex::new(r"(?x)
+            -?(?P<hours>[0-9][0-9])?:?
+            (?P<minutes>[0-5][0-9]):
+            (?P<seconds>[0-5]?[0-9])(?:.[0-9]+)?
+            |
+            -?(?P<value>[0-9]+)(?:.[0-9]+)?
+            (?P<unit>ms|us)?
+        ").unwrap();
+    }
+    
+    let captures = RE.captures(input).unwrap();
+
+    let hours = match captures.name("hours") {
+        Some(hours) => hours.as_str().parse::<u64>().unwrap(),
+        None => 0
+    };
+    let minutes = match captures.name("minutes") {
+        Some(minutes) => minutes.as_str().parse::<u64>().unwrap(),
+        None => 0
+    };
+    let mut seconds = match captures.name("seconds") {
+        Some(seconds) => seconds.as_str().parse::<u64>().unwrap(),
+        None => 0
+    };
+    let value = match captures.name("value") {
+        Some(value) => value.as_str().parse::<u64>().unwrap(),
+        None => 0
+    };
+    let unit = match captures.name("unit") {
+        Some(unit) => unit.as_str(),
+        None => {
+            seconds = value;
+            ""
+        }
+    };
+
+    let duration;
+    
+    if unit == "us" {
+        duration = Duration::from_micros(value);
+    } else if unit == "ms" {
+        duration = Duration::from_millis(value);
+    } else {
+        duration = Duration::from_secs(hours * 3600 + minutes * 60 + seconds);
+    }
+    
+    return Ok(duration);
+}
+
+fn delete_processing_files(processing_path: &str, filename: &str, filter_filename: &str, normalise_filename: &str) {
     let _ = match fs::remove_file(format!("{}{}", &processing_path, &filename)) {
         Ok(res) => res,
         Err(why) => {
@@ -576,7 +655,4 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
             debug!("Failed to remove queue file {} ERROR: {}", &normalise_filename, why);
         }
     };
-
-    let _ = message.channel_id.say(&ctx, format!("Successfully added new file for {}", name));
-    Ok(())
 }
