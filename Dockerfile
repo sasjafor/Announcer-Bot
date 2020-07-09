@@ -9,6 +9,7 @@ RUN apt-get update && \
                                                 ffmpeg \
                                                 lame \
                                                 libopus0 \
+                                                libsqlite3-dev \
                                                 libssl-dev \
                                                 python3 \
                                                 python3-pip \

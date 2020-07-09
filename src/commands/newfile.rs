@@ -1,9 +1,8 @@
-
-use lib::parse::parse_duration;
 use std::{
     fs, 
     fs::File, 
     io::prelude::*,
+    path::Path, 
     process::Command, 
     time::Duration,
 };
@@ -26,9 +25,15 @@ use serenity::{
     },
 };
 
+use rusqlite::{
+    params,
+    Connection,
+};
+
 use url::{Url};
 
 use lib::msg::check_msg;
+use lib::parse::parse_duration;
 
 #[command]
 pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
@@ -54,11 +59,21 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
             return Ok(());
         }
     };
+
+    if arguments.len() < 2 || (arguments.len() > 3 && arguments.len() < 5) {
+        check_msg(message.channel_id.say(&ctx, "Please provide a name for this announcement"));
+        return Ok(());
+    }
+
+    let index_name = arguments[1];
     let filename = format!("{}{}", &name, ".wav");
     let processing_path = "/config/processing/";
-    let audio_path = "/config/audio/";
+    let indexed_path = "/config/index/";
+    let db_path = Path::new("/config/database/db.sqlite");
 
-    if arguments.len() <= 2 {
+    
+
+    if arguments.len() <= 3 {
         let attachments = &message.attachments;
         if !attachments.is_empty() {
             let audio_file = &attachments[0];
@@ -90,7 +105,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
             return Ok(())
         }
     } else {
-        let url = arguments[1];
+        let url = arguments[2];
         let _ = match Url::parse(url) {
             Ok(url) => url,
             Err(why) => {
@@ -100,8 +115,8 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
             }
         };
 
-        let start = arguments[2];
-        let duration = arguments[3];
+        let start = arguments[3];
+        let duration = arguments[4];
 
         let duration_parsed = parse_duration(duration).unwrap();
 
@@ -170,7 +185,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
     let normalise_filename = format!("{}{}", &name, ".normalise.wav");
     let trim_filename = format!("{}{}", &name, ".trim.wav");
 
-    if arguments.len() == 2 || arguments.len() == 5 {
+    if arguments.len() == 3 || arguments.len() == 6 {
         let filter_string = match arguments.last() {
             Some(filter) => filter,
             None =>  {
@@ -261,9 +276,34 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         return Ok(());
     };
 
+    let name_path = format!("{}{}", &indexed_path, &name);
+
+    if !Path::new(&name_path).exists() {
+        let _ = fs::create_dir(name_path)?;
+    }
+
+    let db = match Connection::open(&db_path) {
+        Ok(db) => db,
+        Err(err) => {
+            error!("Failed to open database: {}", err);
+            return Ok(());
+        }
+    };
+
+    let _ = match db.execute(
+        "INSERT OR REPLACE INTO names (name, active_file)
+            VALUES (?1, ?2)",
+        params![&name, &index_name]) {
+            Ok(_) => (),
+            Err(err) => {
+                error!("Failed to insert new name, Error Code {}", err);
+                return Ok(());
+            }
+    };
+
     let _ = match fs::rename(
         format!("{}{}", &processing_path, &trim_filename),
-        format!("{}{}", &audio_path, &filename),
+        format!("{}{}{}{}{}", &indexed_path, &name, "/", &index_name, ".wav"),
     ) {
         Ok(res) => res,
         Err(why) => {

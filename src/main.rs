@@ -7,11 +7,13 @@ extern crate env_logger;
 extern crate serenity;
 extern crate url;
 extern crate regex;
+extern crate rusqlite;
 
 mod lib;
 mod commands;
 
 
+use rusqlite::OptionalExtension;
 use std::{
     env, 
     fs, 
@@ -58,6 +60,12 @@ use serenity::{
 
 use commands::{
     newfile::*,
+    manage::*,
+};
+
+use rusqlite::{
+    params,
+    Connection,
 };
 
 struct VoiceManager;
@@ -193,7 +201,7 @@ impl EventHandler for Handler {
 }
 
 #[group]
-#[commands(newfile)]
+#[commands(newfile, list, set)]
 struct General;
 
 fn main() {
@@ -220,11 +228,18 @@ fn main() {
             )); // set the bot's prefix to "!"
 
     let audio = Path::new("/config/audio");
+    let index = Path::new("/config/index");
     let queue = Path::new("/config/queue");
     let processing = Path::new("/config/processing/");
+    let db_folder = Path::new("/config/database/");
+    let db_path = Path::new("/config/database/db.sqlite");
 
     if !audio.exists() {
         let _ = fs::create_dir(audio);
+    }
+
+    if !index.exists() {
+        let _ = fs::create_dir(index);
     }
 
     if !queue.exists() {
@@ -235,6 +250,32 @@ fn main() {
         let _ = fs::create_dir(processing);
     }
 
+    if !db_folder.exists() {
+        let _ = fs::create_dir(db_folder);
+    }
+
+    let db = match Connection::open(&db_path) {
+        Ok(db) => db,
+        Err(err) => {
+            error!("Failed to open database: {}", err);
+            return;
+        }
+    };
+
+    let _ = match db.execute(
+        "CREATE TABLE IF NOT EXISTS names (
+            name            TEXT PRIMARY KEY, 
+            active_file     TEXT
+            )",
+        params![]) {
+            Ok(_) => (),
+            Err(err) => {
+                print_type_of(&err);
+                error!("Failed to create table, Error Code: {}", err);
+                return;
+            }
+    };
+
     // start listening for events by starting a single shard
     if let Err(why) = client.start() {
         error!("Client error: {:?}", why);
@@ -242,7 +283,33 @@ fn main() {
 }
 
 fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, name: &str) {
-    let path = format!("{}{}{}", "/config/audio/", &name, ".wav");
+    let db_path = Path::new("/config/database/db.sqlite");
+
+    let db = match Connection::open(&db_path) {
+        Ok(db) => db,
+        Err(err) => {
+            error!("Failed to open database: {}", err);
+            return;
+        }
+    };
+
+    let filename = match db.query_row::<String, _, _>(
+        "SELECT active_file FROM names WHERE name=?1",
+        params![&name],
+        |row| row.get(0)).optional() {
+            Ok(filename) => filename,
+            Err(err) => {
+                error!("Failed to query active file for {}, Error Code {}", name, err);
+                return;
+            }
+    };
+
+    let path;
+    if filename.is_some() {
+        path = format!("{}{}{}{}{}", "/config/index/", &name, "/", &filename.unwrap(), ".wav");
+    } else {
+        path = format!("{}{}{}", "/config/audio/", &name, ".wav");
+    }
 
     check_path(&path, &name);
 
@@ -321,4 +388,8 @@ fn check_path(path: &str, name: &str) {
 
         fs::write(text_path, name).expect("Unable to write file");
     }
+}
+
+fn print_type_of<T>(_: &T) {
+    println!("{}", std::any::type_name::<T>())
 }
