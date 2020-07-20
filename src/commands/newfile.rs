@@ -71,8 +71,6 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
     let indexed_path = "/config/index/";
     let db_path = Path::new("/config/database/db.sqlite");
 
-    
-
     if arguments.len() <= 3 {
         let attachments = &message.attachments;
         if !attachments.is_empty() {
@@ -168,7 +166,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
             .arg("-vn")
             .arg("-f")
             .arg("wav")
-            .arg(&filename)
+            .arg(format!("{}{}", "file:", &filename))
             .current_dir(&processing_path)
             .output()
             .expect("failed to run ffmpeg")
@@ -181,100 +179,48 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         }
     }
 
-    let filter_filename = format!("{}{}", &name, ".filter.wav");
-    let normalise_filename = format!("{}{}", &name, ".normalise.wav");
-    let trim_filename = format!("{}{}", &name, ".trim.wav");
+    let processed_filename = format!("{}{}", &name, ".processed.wav");
+
+    let mut filter_string = "";
 
     if arguments.len() == 3 || arguments.len() == 6 {
-        let filter_string = match arguments.last() {
+        filter_string = match arguments.last() {
             Some(filter) => filter,
             None =>  {
                 error!("There was no argument when there should be!");
                 return Ok(());
             }
         };
+    }
 
-        let filter_status = Command::new("ffmpeg")
-            .arg("-y")
-            .arg("-i")
-            .arg(&filename)
-            .arg("-filter:a")
-            .arg(&filter_string)
-            .arg("-f")
-            .arg("wav")
-            .arg(&filter_filename)
-            .current_dir(&processing_path)
-            .output()
-            .expect("Failed to run ffmpeg")
-            .status;
-        
-        if !filter_status.success() {
-            let _ = message.channel_id.say(&ctx, "Failed to apply audio filter");
-            let _ = delete_processing_files(&processing_path, &filename, &filter_filename, &normalise_filename);
-            error!("Failed to apply audio effect for file {}; CODE: {}", &filename, filter_status.code().expect("no exit code"));
-            return Ok(());
-        }
-
+    let normalize_and_filter_string;
+    if filter_string.len() > 0 {
+        normalize_and_filter_string = format!("{}{}", "loudnorm,", &filter_string);
     } else {
-        let _ = match fs::copy(
-            format!("{}{}", &processing_path, &filename),
-            format!("{}{}", &processing_path, &filter_filename),
-        ) {
-            Ok(res) => res,
-            Err(why) => {
-                let _ = message.channel_id.say(&ctx, "Failed to copy file");
-                let _ = delete_processing_files(&processing_path, &filename, &filter_filename, &normalise_filename);
-                error!("Failed to copy file {} ERROR: {}", &filename, why);
-                return Ok(());
-            }
-        };
+        normalize_and_filter_string = "loudnorm".to_string();
     }
 
-    // normalise the audio file
-    let normalise_status = Command::new("ffmpeg-normalize")
-        .arg("-f")
-        .arg("-c:a")
-        .arg("libmp3lame")
-        .arg("-b:a")
-        .arg("128K")
-        .arg(&filter_filename)
-        .arg("-o")
-        .arg(&normalise_filename)
-        .current_dir(&processing_path)
-        .output()
-        .expect("Failed to run ffmpeg-normalize")
-        .status;
-
-    if !normalise_status.success()
-    {
-        let _ = message.channel_id.say(&ctx, "Failed to normalise audio");
-        let _ = delete_processing_files(&processing_path, &filename, &filter_filename, &normalise_filename);
-        error!("Failed to run ffmpeg-normalize for file {} CODE: {}", &filename, normalise_status.code().expect("no exit code"));
-        return Ok(());
-    }
-
-    // trim length to 5s
-    let trim_status = Command::new("ffmpeg")
+    let filter_output = Command::new("ffmpeg")
         .arg("-y")
         .arg("-t")
         .arg("00:00:06")
         .arg("-i")
-        .arg(&normalise_filename)
+        .arg(format!("{}{}", "file:", &filename))
+        .arg("-filter:a")
+        .arg(&normalize_and_filter_string)
         .arg("-f")
         .arg("wav")
-        .arg(&trim_filename)
+        .arg(format!("{}{}", "file:", &processed_filename))
         .current_dir(&processing_path)
-        .output() 
-        .expect("Failed to run fmmpeg")
-        .status;
-
-    if !trim_status.success()
-    {
-        let _ = message.channel_id.say(&ctx, "Failed to shorten length with ffmpeg");
-        let _ = delete_processing_files(&processing_path, &filename, &filter_filename, &normalise_filename);
-        error!("Failed to shorten length with ffmpeg for file {} ERROR: {}", &filename, trim_status.code().expect("no exit code"));
+        .output()
+        .expect("Failed to run ffmpeg");
+    
+    if !filter_output.status.success() {
+        let _ = message.channel_id.say(&ctx, "Failed to apply audio filter");
+        let _ = delete_processing_files(&processing_path, &filename, &processed_filename);
+        error!("Failed to apply audio effect for file {}; CODE: {}", &filename, filter_output.status.code().expect("no exit code"));
         return Ok(());
-    };
+    }
 
     let name_path = format!("{}{}", &indexed_path, &name);
 
@@ -302,14 +248,14 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
     };
 
     let _ = match fs::rename(
-        format!("{}{}", &processing_path, &trim_filename),
+        format!("{}{}", &processing_path, &processed_filename),
         format!("{}{}{}{}{}", &indexed_path, &name, "/", &index_name, ".wav"),
     ) {
         Ok(res) => res,
         Err(why) => {
             let _ = message.channel_id.say(&ctx, "Failed to rename file");
-            let _ = delete_processing_files(&processing_path, &filename, &filter_filename, &normalise_filename);
-            error!("Failed to rename file {} ERROR: {}", &trim_filename, why);
+            let _ = delete_processing_files(&processing_path, &filename, &processed_filename);
+            error!("Failed to rename file {} ERROR: {}", &processed_filename, why);
             return Ok(());
         }
     };
@@ -323,13 +269,13 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         }
     };
 
-    let _ = delete_processing_files(&processing_path, &filename, &filter_filename, &normalise_filename);
+    let _ = delete_processing_files(&processing_path, &filename, &processed_filename);
 
     let _ = message.channel_id.say(&ctx, format!("Successfully added new file for {}", name));
     Ok(())
 }
 
-fn delete_processing_files(processing_path: &str, filename: &str, filter_filename: &str, normalise_filename: &str) {
+fn delete_processing_files(processing_path: &str, filename: &str, processed_filename: &str) {
     let _ = match fs::remove_file(format!("{}{}", &processing_path, &filename)) {
         Ok(res) => res,
         Err(why) => {
@@ -337,17 +283,10 @@ fn delete_processing_files(processing_path: &str, filename: &str, filter_filenam
         }
     };
 
-    let _ = match fs::remove_file(format!("{}{}", &processing_path, &filter_filename)) {
+    let _ = match fs::remove_file(format!("{}{}", &processing_path, &processed_filename)) {
         Ok(res) => res,
         Err(why) => {
-            debug!("Failed to remove queue file {} ERROR: {}", &filter_filename, why);
-        }
-    };
-
-    let _ = match fs::remove_file(format!("{}{}", &processing_path, &normalise_filename)) {
-        Ok(res) => res,
-        Err(why) => {
-            debug!("Failed to remove queue file {} ERROR: {}", &normalise_filename, why);
+            debug!("Failed to remove queue file {} ERROR: {}", &processed_filename, why);
         }
     };
 }
