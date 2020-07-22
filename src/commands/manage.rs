@@ -1,4 +1,5 @@
 use std::{
+    ffi::OsStr,
     fs, 
     path::Path, 
 };
@@ -22,8 +23,9 @@ use serenity::{
 };
 
 use rusqlite::{
-    params,
     Connection,
+    OptionalExtension,
+    params,
 };
 
 use lib::msg::check_msg;
@@ -43,6 +45,27 @@ pub fn list(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
     let path_string = format!("{}{}", "/config/index/", &name);
     let path = Path::new(&path_string);
 
+    let db_path = Path::new("/config/database/db.sqlite");
+
+    let db = match Connection::open(&db_path) {
+        Ok(db) => db,
+        Err(err) => {
+            error!("Failed to open database: {}", err);
+            return Ok(());
+        }
+    };
+
+    let filename = match db.query_row::<String, _, _>(
+        "SELECT active_file FROM names WHERE name=?1",
+        params![&name],
+        |row| row.get(0)).optional() {
+            Ok(filename) => filename,
+            Err(err) => {
+                error!("Failed to query active file for {}, Error Code {}", name, err);
+                return Ok(());
+            }
+    };
+
     if path.is_dir() {
         let dir_iterator = match fs::read_dir(path) {
             Ok(dir_iterator) => dir_iterator,
@@ -51,6 +74,13 @@ pub fn list(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
                 return Ok(());
             }
         };
+
+        let mut active_filename = None;
+        let active_filename_str;
+        if filename.is_some() {
+            active_filename_str = filename.unwrap();
+            active_filename = Some(OsStr::new(&active_filename_str));
+        }
 
         let mut k = 1;
         for entry in dir_iterator {
@@ -62,7 +92,11 @@ pub fn list(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
                 }
             };
             if !entry_value.path().is_dir() {
-                check_msg(message.channel_id.say(&ctx, format!("{}{}{:?}", k, ". ", entry_value.path().file_stem().unwrap())));
+                if active_filename.is_some() && entry_value.path().file_stem().unwrap() == active_filename.unwrap() {
+                    check_msg(message.channel_id.say(&ctx, format!("{}{}{:?}{}", k, ". ", entry_value.path().file_stem().unwrap(), "   <--- ACTIVE")));
+                } else {
+                    check_msg(message.channel_id.say(&ctx, format!("{}{}{:?}", k, ". ", entry_value.path().file_stem().unwrap())));
+                }
                 k += 1;
             }
         }
@@ -110,10 +144,11 @@ pub fn set(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
         }
     };
 
+    let user_id = message.author.id.as_u64();
     let _ = match db.execute(
-        "INSERT OR REPLACE INTO names (name, active_file)
-            VALUES (?1, ?2)",
-        params![&name, &filename]) {
+        "INSERT OR REPLACE INTO names (name, user_id, active_file)
+            VALUES (?1, ?2, ?3)",
+        params![&name, *user_id as i64, &filename]) {
             Ok(_) => (),
             Err(err) => {
                 error!("Failed to insert new name, Error Code {}", err);

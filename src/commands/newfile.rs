@@ -228,6 +228,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         let _ = fs::create_dir(name_path)?;
     }
 
+
     let db = match Connection::open(&db_path) {
         Ok(db) => db,
         Err(err) => {
@@ -236,10 +237,11 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         }
     };
 
+    let user_id = message.author.id.as_u64();
     let _ = match db.execute(
-        "INSERT OR REPLACE INTO names (name, active_file)
-            VALUES (?1, ?2)",
-        params![&name, &index_name]) {
+        "INSERT OR REPLACE INTO names (name, user_id, active_file)
+            VALUES (?1, ?2, ?3)",
+        params![&name, *user_id as i64, &index_name]) {
             Ok(_) => (),
             Err(err) => {
                 error!("Failed to insert new name, Error Code {}", err);

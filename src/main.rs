@@ -12,8 +12,6 @@ extern crate rusqlite;
 mod lib;
 mod commands;
 
-
-use rusqlite::OptionalExtension;
 use std::{
     env, 
     fs, 
@@ -64,8 +62,9 @@ use commands::{
 };
 
 use rusqlite::{
-    params,
     Connection,
+    OptionalExtension,
+    params,
 };
 
 struct VoiceManager;
@@ -194,7 +193,7 @@ impl EventHandler for Handler {
 
             let name = member.display_name().to_string();
 
-            let _ = announce(&ctx, channel_id, guild_id, &name);
+            let _ = announce(&ctx, channel_id, guild_id, &name, *user_id.as_u64());
             return;
         }
     }
@@ -264,8 +263,10 @@ fn main() {
 
     let _ = match db.execute(
         "CREATE TABLE IF NOT EXISTS names (
-            name            TEXT PRIMARY KEY, 
-            active_file     TEXT
+            name            TEXT NOT NULL, 
+            user_id         INTEGER NOT NULL,
+            active_file     TEXT,
+            PRIMARY KEY ( name, user_id )
             )",
         params![]) {
             Ok(_) => (),
@@ -282,7 +283,7 @@ fn main() {
     }
 }
 
-fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, name: &str) {
+fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, name: &str, user_id: u64) {
     let db_path = Path::new("/config/database/db.sqlite");
 
     let db = match Connection::open(&db_path) {
@@ -294,8 +295,8 @@ fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, name: &str)
     };
 
     let filename = match db.query_row::<String, _, _>(
-        "SELECT active_file FROM names WHERE name=?1",
-        params![&name],
+        "SELECT active_file FROM names WHERE name=?1 AND user_id=?2",
+        params![&name, user_id as i64],
         |row| row.get(0)).optional() {
             Ok(filename) => filename,
             Err(err) => {
