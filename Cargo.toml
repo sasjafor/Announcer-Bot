@@ -4,7 +4,7 @@ version = "0.2.1"
 authors = ["sasjafor <john93412@gmail.com>"]
 
 [dependencies]
-log = "0.4.8"
+log = "0.4.11"
 env_logger = "0.7.1"
 libsodium-sys = "0.2.5"
 url = "2.1.1"

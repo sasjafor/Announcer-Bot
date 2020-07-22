@@ -13,6 +13,7 @@ mod lib;
 mod commands;
 
 use std::{
+    collections::HashSet,
     env, 
     fs, 
     path::Path, 
@@ -31,8 +32,14 @@ use serenity::{
     },
     framework::{
         standard::{
+            Args,
+            CommandGroup,
+            CommandResult,
+            HelpOptions,
+            help_commands,
             macros::{
                 group,
+                help,
             }, 
         },
         StandardFramework
@@ -201,7 +208,24 @@ impl EventHandler for Handler {
 
 #[group]
 #[commands(newfile, list, set)]
+#[only_in("guilds")]
+#[help_available]
 struct General;
+
+#[help]
+#[no_help_available_text("No help available for this command")]
+#[command_not_found_text = "Could not find: `{}`."]
+#[max_levenshtein_distance(3)]
+fn my_help(
+    context: &mut Context,
+    msg: &Message,
+    args: Args,
+    help_options: &'static HelpOptions,
+    groups: &[&'static CommandGroup],
+    owners: HashSet<UserId>
+) -> CommandResult {
+    help_commands::plain(context, msg, args, help_options, groups, owners)
+}
 
 fn main() {
     // Initialize the logger to use environment variables.
@@ -222,8 +246,13 @@ fn main() {
 
     client.with_framework(StandardFramework::new()
             .group(&GENERAL_GROUP)
+            .help(&MY_HELP)
             .configure(|c| c
                 .prefix("!")
+                .allow_dm(false)
+                .case_insensitivity(true)
+                .allowed_channels(vec![ ChannelId(552168558323564544), 
+                                        ChannelId(511144158975623169)].into_iter().collect())
             )); // set the bot's prefix to "!"
 
     let audio = Path::new("/config/audio");

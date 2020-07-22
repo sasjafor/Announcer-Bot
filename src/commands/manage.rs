@@ -31,6 +31,12 @@ use rusqlite::{
 use lib::msg::check_msg;
 
 #[command]
+#[description("List all available announcements for a name")]
+#[usage("<discordname>")]
+#[example("Yzarul")]
+#[example("\"Mr Yzarul\"")]
+#[num_args(1)]
+#[help_available]
 pub fn list(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
     let arguments = args.raw_quoted().collect::<Vec<&str>>();
 
@@ -82,6 +88,8 @@ pub fn list(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
             active_filename = Some(OsStr::new(&active_filename_str));
         }
 
+        check_msg(message.channel_id.say(&ctx, format!("Announcements for \"{}\"", &name)));
+
         let mut k = 1;
         for entry in dir_iterator {
             let entry_value = match entry {
@@ -93,9 +101,9 @@ pub fn list(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
             };
             if !entry_value.path().is_dir() {
                 if active_filename.is_some() && entry_value.path().file_stem().unwrap() == active_filename.unwrap() {
-                    check_msg(message.channel_id.say(&ctx, format!("{}{}{:?}{}", k, ". ", entry_value.path().file_stem().unwrap(), "   <--- ACTIVE")));
+                    check_msg(message.channel_id.say(&ctx, format!("{}. {:?}   <--- ACTIVE FOR @{}", k, entry_value.path().file_stem().unwrap(), &message.author.name)));
                 } else {
-                    check_msg(message.channel_id.say(&ctx, format!("{}{}{:?}", k, ". ", entry_value.path().file_stem().unwrap())));
+                    check_msg(message.channel_id.say(&ctx, format!("{}. {:?}", k, entry_value.path().file_stem().unwrap())));
                 }
                 k += 1;
             }
@@ -108,6 +116,13 @@ pub fn list(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
 }
 
 #[command]
+#[aliases("setactive", "set_active")]
+#[description("Set the active announcement for a nickname")]
+#[usage("<discordname> <announcement name>")]
+#[example("Yzarul funny")]
+#[example("\"Mr Yzarul\" \"funny noise\"")]
+#[num_args(2)]
+#[help_available]
 pub fn set(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
     let arguments = args.raw_quoted().collect::<Vec<&str>>();
 
@@ -156,6 +171,6 @@ pub fn set(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
             }
     };
 
-    check_msg(message.channel_id.say(&ctx, format!("Active file for {} is now {}", &name, &filename)));
+    check_msg(message.channel_id.say(&ctx, format!("Active file for user \"{}\" & name \"{}\" is now \"{}\"", &message.author.name, &name, &filename)));
     return Ok(());
 }

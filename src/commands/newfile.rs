@@ -36,20 +36,17 @@ use lib::msg::check_msg;
 use lib::parse::parse_duration;
 
 #[command]
+#[description("Submit a new announcement either as file or url")]
+#[usage("<discordname> <announcement-name> [<filters>]\nnewfile <discordname> <announcement-name> <url> <start time> <duration> [<filters>]")]
+#[example("\"Mr Yzarul\" \"funny noise\"")]
+#[example("\"Mr Yzarul\" \"funny noise\" \"vibrato\"")]
+#[example("\"Mr Yzarul\" \"funny noise\" \"https://www.youtube.com/watch?v=dQw4w9WgXcQ\" 20 7")]
+#[example("\"Mr Yzarul\" \"funny noise\" \"https://www.youtube.com/watch?v=dQw4w9WgXcQ\" 02:20 4")]
+#[example("See all filters here https://ffmpeg.org/ffmpeg-filters.html")]
+#[min_args(2)]
+#[max_args(6)]
+#[help_available]
 pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
-    let channel_name = match message.channel_id.name(&ctx) {
-        Some(name) => name,
-        None => {
-            debug!("No channel name found");
-            return Ok(());
-        }
-    };
-
-    if channel_name != "announcer-bot-submissions" {
-        debug!("command used in wrong channel");
-        return Ok(())
-    }
-
     let arguments = args.raw_quoted().collect::<Vec<&str>>();
 
     let name = match arguments.first() {
