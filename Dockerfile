@@ -1,4 +1,4 @@
-FROM rust:1.43
+FROM rust:1.45
 
 # Install rust toolchain
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
@@ -11,15 +11,9 @@ RUN apt-get update && \
                                                 libopus0 \
                                                 libsqlite3-dev \
                                                 libssl-dev \
-                                                python3 \
-                                                python3-pip \
-                                                python3-setuptools \
                                                 vorbis-tools \
                                                 && \
     mkdir /config
-
-# Install ffmpeg-normalize
-RUN pip3 install ffmpeg-normalize
 
 # Create empty shell project
 RUN USER=root cargo new --bin announcer_bot

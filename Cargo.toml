@@ -6,11 +6,12 @@ authors = ["sasjafor <john93412@gmail.com>"]
 [dependencies]
 log = "0.4.11"
 env_logger = "0.7.1"
-libsodium-sys = "0.2.5"
+libsodium-sys = "0.2.6"
 url = "2.1.1"
 regex = "1.3.9"
 lazy_static = "1.4.0"
 rusqlite = "0.23.1"
+rand = "0.7.3"
 
 [dependencies.serenity]
 default-features = false

@@ -8,6 +8,7 @@ extern crate serenity;
 extern crate url;
 extern crate regex;
 extern crate rusqlite;
+extern crate rand;
 
 mod lib;
 mod commands;
@@ -15,7 +16,10 @@ mod commands;
 use std::{
     collections::HashSet,
     env, 
-    fs, 
+    fs::{
+        self,
+        read_dir,
+    }, 
     path::Path, 
     process::Command, 
     sync::{
@@ -73,6 +77,8 @@ use rusqlite::{
     OptionalExtension,
     params,
 };
+
+use rand::Rng;
 
 struct VoiceManager;
 
@@ -155,6 +161,7 @@ impl EventHandler for Handler {
         let channel_id = maybe_channel_id.unwrap();
         
         if (&old_state).is_none() {
+            let path = "/config/StGallerConnection.mp3";
             if user_id == USER1_ID {
                 let mut user_check = guild
                                     .voice_states
@@ -164,7 +171,7 @@ impl EventHandler for Handler {
                                     .peekable();
                     
                 if user_check.peek().is_some() {
-                    let path = "/config/StGallerConnection.mp3";
+                    
                     play_file(&ctx, channel_id, guild_id, &path);
                 }
             }
@@ -178,8 +185,6 @@ impl EventHandler for Handler {
                                     .peekable();
                     
                 if user_check.peek().is_some() {
-                    info!("cousins");
-                    let path = "/config/StGallerConnection.mp3";
                     play_file(&ctx, channel_id, guild_id, &path);
                 }
             }
@@ -207,7 +212,7 @@ impl EventHandler for Handler {
 }
 
 #[group]
-#[commands(newfile, list, set)]
+#[commands(newfile, list, set, random)]
 #[only_in("guilds")]
 #[help_available]
 struct General;
@@ -294,7 +299,8 @@ fn main() {
         "CREATE TABLE IF NOT EXISTS names (
             name            TEXT NOT NULL, 
             user_id         INTEGER NOT NULL,
-            active_file     TEXT,
+            active_file     TEXT DEFAULT '',
+            random          INTEGER DEFAULT 0,
             PRIMARY KEY ( name, user_id )
             )",
         params![]) {
@@ -326,19 +332,39 @@ fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, name: &str,
     let filename = match db.query_row::<String, _, _>(
         "SELECT active_file FROM names WHERE name=?1 AND user_id=?2",
         params![&name, user_id as i64],
-        |row| row.get(0)).optional() {
-            Ok(filename) => filename,
+        |row| row.get(row.column_index("active_file").unwrap())).optional() {
+            Ok(row) => row,
             Err(err) => {
                 error!("Failed to query active file for {}, Error Code {}", name, err);
                 return;
             }
     };
 
+    let index_base_path = format!("/config/index/{}", &name);
+    let files = read_dir(&index_base_path).ok();
     let path;
-    if filename.is_some() {
-        path = format!("{}{}{}{}{}", "/config/index/", &name, "/", &filename.unwrap(), ".wav");
+    if filename.is_some() && files.is_some() {
+        let random = match db.query_row::<bool, _, _>(
+            "SELECT random FROM names WHERE name=?1 AND user_id=?2",
+            params![&name, user_id as i64],
+            |row| row.get(row.column_index("random").unwrap())) {
+                Ok(row) => row,
+                Err(err) => {
+                    error!("Failed to query random file for {}, Error Code {}", name, err);
+                    return;
+                }
+        };
+
+        let count = files.unwrap().count();
+        if random && count > 0 {
+            let index = rand::thread_rng().gen_range(0, count);
+            let mut paths = read_dir(&index_base_path).unwrap();
+            path = paths.nth(index).unwrap().unwrap().path().to_str().unwrap().to_owned();
+        } else {
+            path = format!("{}/{}.wav", &index_base_path, &filename.unwrap());
+        }
     } else {
-        path = format!("{}{}{}", "/config/audio/", &name, ".wav");
+        path = format!("/config/audio/{}.wav", &name);
     }
 
     check_path(&path, &name);
@@ -414,7 +440,7 @@ fn check_path(path: &str, name: &str) {
             .arg(name)
             .output()
             .expect("Failed to run espeak!");
-        let text_path = format!("{}{}", "/config/queue/", &name);
+        let text_path = format!("/config/queue/{}", &name);
 
         fs::write(text_path, name).expect("Unable to write file");
     }

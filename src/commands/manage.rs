@@ -48,7 +48,7 @@ pub fn list(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
         }
     };
 
-    let path_string = format!("{}{}", "/config/index/", &name);
+    let path_string = format!("/config/index/{}", &name);
     let path = Path::new(&path_string);
 
     let db_path = Path::new("/config/database/db.sqlite");
@@ -141,7 +141,7 @@ pub fn set(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
 
     let filename = arguments[1];
 
-    let path_string = format!("{}{}{}{}{}", "/config/index/", &name, "/", &filename, ".wav");
+    let path_string = format!("/config/index/{}/{}.wav", &name, &filename);
     let path = Path::new(&path_string);
 
     if !path.exists() {
@@ -172,5 +172,52 @@ pub fn set(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
     };
 
     check_msg(message.channel_id.say(&ctx, format!("Active file for user \"{}\" & name \"{}\" is now \"{}\"", &message.author.name, &name, &filename)));
+    return Ok(());
+}
+
+#[command]
+#[aliases("rand")]
+#[description("Set random mode for a certain name")]
+#[usage("<discordname> <random active>")]
+#[example("Yzarul 1")]
+#[example("\"Mr Yzarul\" 0")]
+#[num_args(2)]
+#[help_available]
+pub fn random(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
+    info!("RANDOM COMMAND");
+    let arguments = args.raw_quoted().collect::<Vec<&str>>();
+
+    let name = match arguments.first() {
+        Some(name) => name,
+        None => {
+            check_msg(message.channel_id.say(&ctx, "Please provide a name"));
+            return Ok(());
+        }
+    };
+
+    let random = arguments[1];
+
+    let db_path = Path::new("/config/database/db.sqlite");
+
+    let db = match Connection::open(&db_path) {
+        Ok(db) => db,
+        Err(err) => {
+            error!("Failed to open database: {}", err);
+            return Ok(());
+        }
+    };
+
+    let user_id = message.author.id.as_u64();
+    let _ = match db.execute(
+        "INSERT OR REPLACE INTO names (name, user_id, random)
+            VALUES (?1, ?2, ?3)",
+        params![&name, *user_id as i64, random]) {
+            Ok(_) => (),
+            Err(err) => {
+                error!("Failed to insert new name, Error Code {}", err);
+                return Ok(());
+            }
+    };
+
     return Ok(());
 }

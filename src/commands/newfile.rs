@@ -63,7 +63,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
     }
 
     let index_name = arguments[1];
-    let filename = format!("{}{}", &name, ".wav");
+    let filename = format!("{}.wav", &name);
     let processing_path = "/config/processing/";
     let indexed_path = "/config/index/";
     let db_path = Path::new("/config/database/db.sqlite");
@@ -192,7 +192,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
 
     let normalize_and_filter_string;
     if filter_string.len() > 0 {
-        normalize_and_filter_string = format!("{}{}", "loudnorm,", &filter_string);
+        normalize_and_filter_string = format!("loudnorm,{}", &filter_string);
     } else {
         normalize_and_filter_string = "loudnorm".to_string();
     }
@@ -202,12 +202,12 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         .arg("-t")
         .arg("00:00:06")
         .arg("-i")
-        .arg(format!("{}{}", "file:", &filename))
+        .arg(format!("file:{}", &filename))
         .arg("-filter:a")
         .arg(&normalize_and_filter_string)
         .arg("-f")
         .arg("wav")
-        .arg(format!("{}{}", "file:", &processed_filename))
+        .arg(format!("file:{}", &processed_filename))
         .current_dir(&processing_path)
         .output()
         .expect("Failed to run ffmpeg");
@@ -248,7 +248,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
 
     let _ = match fs::rename(
         format!("{}{}", &processing_path, &processed_filename),
-        format!("{}{}{}{}{}", &indexed_path, &name, "/", &index_name, ".wav"),
+        format!("{}{}/{}.wav", &indexed_path, &name, &index_name),
     ) {
         Ok(res) => res,
         Err(why) => {
@@ -259,7 +259,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         }
     };
 
-    let text_path = format!("{}{}", "/config/queue/", &name);
+    let text_path = format!("/config/queue/{}", &name);
 
     let _ = match fs::remove_file(&text_path) {
         Ok(res) => res,
