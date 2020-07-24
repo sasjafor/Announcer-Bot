@@ -332,7 +332,7 @@ fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, name: &str,
     let filename = match db.query_row::<String, _, _>(
         "SELECT active_file FROM names WHERE name=?1 AND user_id=?2",
         params![&name, user_id as i64],
-        |row| row.get(row.column_index("active_file").unwrap())).optional() {
+        |row| row.get(0)).optional() {
             Ok(row) => row,
             Err(err) => {
                 error!("Failed to query active file for {}, Error Code {}", name, err);
@@ -347,7 +347,7 @@ fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, name: &str,
         let random = match db.query_row::<bool, _, _>(
             "SELECT random FROM names WHERE name=?1 AND user_id=?2",
             params![&name, user_id as i64],
-            |row| row.get(row.column_index("random").unwrap())) {
+            |row| row.get(0)) {
                 Ok(row) => row,
                 Err(err) => {
                     error!("Failed to query random file for {}, Error Code {}", name, err);

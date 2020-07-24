@@ -184,7 +184,6 @@ pub fn set(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
 #[num_args(2)]
 #[help_available]
 pub fn random(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
-    info!("RANDOM COMMAND");
     let arguments = args.raw_quoted().collect::<Vec<&str>>();
 
     let name = match arguments.first() {
