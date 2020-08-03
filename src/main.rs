@@ -257,7 +257,8 @@ fn main() {
                 .allow_dm(false)
                 .case_insensitivity(true)
                 .allowed_channels(vec![ ChannelId(552168558323564544), 
-                                        ChannelId(511144158975623169)].into_iter().collect())
+                                        ChannelId(511144158975623169),
+                                        ChannelId(739933045406171166)].into_iter().collect())
             )); // set the bot's prefix to "!"
 
     let audio = Path::new("/config/audio");
