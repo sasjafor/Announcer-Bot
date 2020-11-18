@@ -22,13 +22,15 @@ use serenity::{
     },
 };
 
+use tracing::{error};
+
 use rusqlite::{
     Connection,
     OptionalExtension,
     params,
 };
 
-use lib::msg::check_msg;
+use crate::lib::msg::check_msg;
 
 #[command]
 #[description("List all available announcements for a name")]
@@ -37,13 +39,13 @@ use lib::msg::check_msg;
 #[example("\"Mr Yzarul\"")]
 #[num_args(1)]
 #[help_available]
-pub fn list(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
+pub async fn list(ctx: &Context, message: &Message, args: Args) -> CommandResult {
     let arguments = args.raw_quoted().collect::<Vec<&str>>();
 
     let name = match arguments.first() {
         Some(name) => name,
         None => {
-            check_msg(message.channel_id.say(&ctx, "Please provide a name"));
+            check_msg(message.channel_id.say(&ctx, "Please provide a name").await);
             return Ok(());
         }
     };
@@ -88,7 +90,7 @@ pub fn list(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
             active_filename = Some(OsStr::new(&active_filename_str));
         }
 
-        check_msg(message.channel_id.say(&ctx, format!("Announcements for \"{}\"", &name)));
+        check_msg(message.channel_id.say(&ctx, format!("Announcements for \"{}\"", &name)).await);
 
         let mut k = 1;
         for entry in dir_iterator {
@@ -101,15 +103,15 @@ pub fn list(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
             };
             if !entry_value.path().is_dir() {
                 if active_filename.is_some() && entry_value.path().file_stem().unwrap() == active_filename.unwrap() {
-                    check_msg(message.channel_id.say(&ctx, format!("{}. {:?}   <--- ACTIVE FOR @{}", k, entry_value.path().file_stem().unwrap(), &message.author.name)));
+                    check_msg(message.channel_id.say(&ctx, format!("{}. {:?}   <--- ACTIVE FOR @{}", k, entry_value.path().file_stem().unwrap(), &message.author.name)).await);
                 } else {
-                    check_msg(message.channel_id.say(&ctx, format!("{}. {:?}", k, entry_value.path().file_stem().unwrap())));
+                    check_msg(message.channel_id.say(&ctx, format!("{}. {:?}", k, entry_value.path().file_stem().unwrap())).await);
                 }
                 k += 1;
             }
         }
     } else {
-        check_msg(message.channel_id.say(&ctx, "This name doesn't exist"));
+        check_msg(message.channel_id.say(&ctx, "This name doesn't exist").await);
     }
 
     return Ok(());
@@ -123,19 +125,19 @@ pub fn list(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
 #[example("\"Mr Yzarul\" \"funny noise\"")]
 #[num_args(2)]
 #[help_available]
-pub fn set(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
+pub async fn set(ctx: &Context, message: &Message, args: Args) -> CommandResult {
     let arguments = args.raw_quoted().collect::<Vec<&str>>();
 
     let name = match arguments.first() {
         Some(name) => name,
         None => {
-            check_msg(message.channel_id.say(&ctx, "Please provide a name"));
+            check_msg(message.channel_id.say(&ctx, "Please provide a name").await);
             return Ok(());
         }
     };
 
     if arguments.len() < 2 {
-        check_msg(message.channel_id.say(&ctx, "Please provide the name for the file you want to set active"));
+        check_msg(message.channel_id.say(&ctx, "Please provide the name for the file you want to set active").await);
         return Ok(());
     }
 
@@ -145,7 +147,7 @@ pub fn set(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
     let path = Path::new(&path_string);
 
     if !path.exists() {
-        check_msg(message.channel_id.say(&ctx, "Please choose a valid filename"));
+        check_msg(message.channel_id.say(&ctx, "Please choose a valid filename").await);
         return Ok(());
     }
 
@@ -171,7 +173,7 @@ pub fn set(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
             }
     };
 
-    check_msg(message.channel_id.say(&ctx, format!("Active file for user \"{}\" & name \"{}\" is now \"{}\"", &message.author.name, &name, &filename)));
+    check_msg(message.channel_id.say(&ctx, format!("Active file for user \"{}\" & name \"{}\" is now \"{}\"", &message.author.name, &name, &filename)).await);
     return Ok(());
 }
 
@@ -183,13 +185,13 @@ pub fn set(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
 #[example("\"Mr Yzarul\" 0")]
 #[num_args(2)]
 #[help_available]
-pub fn random(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
+pub async fn random(ctx: &Context, message: &Message, args: Args) -> CommandResult {
     let arguments = args.raw_quoted().collect::<Vec<&str>>();
 
     let name = match arguments.first() {
         Some(name) => name,
         None => {
-            check_msg(message.channel_id.say(&ctx, "Please provide a name"));
+            check_msg(message.channel_id.say(&ctx, "Please provide a name").await);
             return Ok(());
         }
     };

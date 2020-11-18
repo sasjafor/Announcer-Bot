@@ -1,4 +1,4 @@
-
+use lazy_static::lazy_static;
 use regex::Regex;
 use std::time::Duration;
 

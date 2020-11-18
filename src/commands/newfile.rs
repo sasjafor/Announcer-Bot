@@ -25,6 +25,8 @@ use serenity::{
     },
 };
 
+use tracing::{debug, error};
+
 use rusqlite::{
     params,
     Connection,
@@ -32,8 +34,8 @@ use rusqlite::{
 
 use url::{Url};
 
-use lib::msg::check_msg;
-use lib::parse::parse_duration;
+use crate::lib::msg::check_msg;
+use crate::lib::parse::parse_duration;
 
 #[command]
 #[description("Submit a new announcement either as file or url")]
@@ -46,19 +48,19 @@ use lib::parse::parse_duration;
 #[min_args(2)]
 #[max_args(6)]
 #[help_available]
-pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResult {
+pub async fn newfile(ctx: &Context, message: &Message, args: Args) -> CommandResult {
     let arguments = args.raw_quoted().collect::<Vec<&str>>();
 
     let name = match arguments.first() {
         Some(name) => name,
         None => {
-            check_msg(message.channel_id.say(&ctx, "Please provide a name"));
+            check_msg(message.channel_id.say(&ctx, "Please provide a name").await);
             return Ok(());
         }
     };
 
     if arguments.len() < 2 || (arguments.len() > 3 && arguments.len() < 5) {
-        check_msg(message.channel_id.say(&ctx, "Please provide a name for this announcement"));
+        check_msg(message.channel_id.say(&ctx, "Please provide a name for this announcement").await);
         return Ok(());
     }
 
@@ -72,10 +74,10 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
         let attachments = &message.attachments;
         if !attachments.is_empty() {
             let audio_file = &attachments[0];
-            let content = match audio_file.download() {
+            let content = match audio_file.download().await {
                 Ok(content) => content,
                 Err(why) => {
-                    check_msg(message.channel_id.say(&ctx, "Error downloading attachment"));
+                    check_msg(message.channel_id.say(&ctx, "Error downloading attachment").await);
                     error!("Error downloading attachment: {:?}", why);
                     return Ok(());
                 }
@@ -84,7 +86,7 @@ pub fn newfile(ctx: &mut Context, message: &Message, args: Args) -> CommandResul
             let mut file = match File::create(format!("{}{}", processing_path, &filename)) {
                 Ok(file) => file,
                 Err(why) => {
-                    check_msg(message.channel_id.say(&ctx, "Error creating file"));
+                    check_msg(message.channel_id.say(&ctx, "Error creating file").await);
                     error!("Error creating file: {:?}", why);
                     return Ok(());
                 }
