@@ -93,12 +93,12 @@ pub async fn newfile(ctx: &Context, message: &Message, args: Args) -> CommandRes
             };
 
             if let Err(why) = file.write(&content) {
-                let _ = message.channel_id.say(&ctx, "Error writing file");
+                let _ = check_msg(message.channel_id.say(&ctx, "Error writing file").await);
                 error!("Error writing to file: {:?}", why);
                 return Ok(());
             }
         } else {
-            let _ = message.channel_id.say(&ctx, "Please attach an audio file");
+            let _ = check_msg(message.channel_id.say(&ctx, "Please attach an audio file").await);
             return Ok(())
         }
     } else {
@@ -106,7 +106,7 @@ pub async fn newfile(ctx: &Context, message: &Message, args: Args) -> CommandRes
         let _ = match Url::parse(url) {
             Ok(url) => url,
             Err(why) => {
-                let _ = message.channel_id.say(&ctx, "Please provide a valid url");
+                let _ = check_msg(message.channel_id.say(&ctx, "Please provide a valid url").await);
                 debug!("Invalid url: {}", why);
                 return Ok(());
             }
@@ -118,7 +118,7 @@ pub async fn newfile(ctx: &Context, message: &Message, args: Args) -> CommandRes
         let duration_parsed = parse_duration(duration).unwrap();
 
         if duration_parsed > Duration::from_secs(7) {
-            let _ = message.channel_id.say(&ctx, "Duration too long");
+            let _ = check_msg(message.channel_id.say(&ctx, "Duration too long").await);
             debug!("Duration is too long {}", duration);
             return Ok(())
         }
@@ -130,7 +130,7 @@ pub async fn newfile(ctx: &Context, message: &Message, args: Args) -> CommandRes
             .expect("Failed to run youtube-dl");
 
         if !youtube_url.status.success() {
-            let _ = message.channel_id.say(&ctx, "Youtube url error");
+            let _ = check_msg(message.channel_id.say(&ctx, "Youtube url error").await);
             error!("Error for youtube url {}", url);
             return Ok(())
         }
@@ -138,7 +138,7 @@ pub async fn newfile(ctx: &Context, message: &Message, args: Args) -> CommandRes
         let youtube_dloutput = match String::from_utf8(youtube_url.stdout) {
             Ok(res) => res,
             Err(why) => {
-                let _ = message.channel_id.say(&ctx, "Failed to parse youtube-dl output");
+                let _ = check_msg(message.channel_id.say(&ctx, "Failed to parse youtube-dl output").await);
                 error!("Failed to parse youtube-dl output {}", why);
                 return Ok(())
             }
@@ -148,7 +148,7 @@ pub async fn newfile(ctx: &Context, message: &Message, args: Args) -> CommandRes
         let audio_url = match lines.last() {
             Some(line) => line,
             None => {
-                let _ = message.channel_id.say(&ctx, "Youtube empty info");
+                let _ = check_msg(message.channel_id.say(&ctx, "Youtube empty info").await);
                 error!("Empty info for {}", url);
                 return Ok(())
             }
@@ -172,7 +172,7 @@ pub async fn newfile(ctx: &Context, message: &Message, args: Args) -> CommandRes
             .status;
         
         if !download_status.success() {
-            let _ = message.channel_id.say(&ctx, "Failed to download from youtube");
+            let _ = check_msg(message.channel_id.say(&ctx, "Failed to download from youtube").await);
             error!("Failed to run ffmpeg to download audio for file {}; CODE: {}", &filename, download_status.code().expect("no exit code"));
             return Ok(());
         }
@@ -215,7 +215,7 @@ pub async fn newfile(ctx: &Context, message: &Message, args: Args) -> CommandRes
         .expect("Failed to run ffmpeg");
     
     if !filter_output.status.success() {
-        let _ = message.channel_id.say(&ctx, "Failed to apply audio filter");
+        let _ = check_msg(message.channel_id.say(&ctx, "Failed to apply audio filter").await);
         let _ = delete_processing_files(&processing_path, &filename, &processed_filename);
         error!("Failed to apply audio effect for file {}; CODE: {}", &filename, filter_output.status.code().expect("no exit code"));
         return Ok(());
@@ -254,7 +254,7 @@ pub async fn newfile(ctx: &Context, message: &Message, args: Args) -> CommandRes
     ) {
         Ok(res) => res,
         Err(why) => {
-            let _ = message.channel_id.say(&ctx, "Failed to rename file");
+            let _ = check_msg(message.channel_id.say(&ctx, "Failed to rename file").await);
             let _ = delete_processing_files(&processing_path, &filename, &processed_filename);
             error!("Failed to rename file {} ERROR: {}", &processed_filename, why);
             return Ok(());
@@ -272,7 +272,7 @@ pub async fn newfile(ctx: &Context, message: &Message, args: Args) -> CommandRes
 
     let _ = delete_processing_files(&processing_path, &filename, &processed_filename);
 
-    let _ = message.channel_id.say(&ctx, format!("Successfully added new file for {}", name));
+    let _ = check_msg(message.channel_id.say(&ctx, format!("Successfully added new file for {}", name)).await);
     Ok(())
 }
 
