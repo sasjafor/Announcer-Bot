@@ -6,19 +6,19 @@ edition = "2018"
 
 [dependencies]
 log = "0.4.11"
-env_logger = "0.8.1"
+env_logger = "0.8.2"
 libsodium-sys = "0.2.6"
 url = "2.2.0"
 regex = "1.4.2"
 lazy_static = "1.4.0"
-rusqlite = "0.24.1"
-rand = "0.7.3"
+rusqlite = "0.24.2"
+rand = "0.8.0"
 tracing = "0.1"
 tracing-subscriber = "0.2"
 tracing-futures = "0.2" # needed so intrument works with async functions.
 
 [dependencies.tokio]
-version = "0.2"
+version = "0.2.24"
 features = ["macros", "signal"]
 
 [dependencies.serenity]
@@ -36,4 +36,4 @@ features = [
     "voice",
     "native_tls_backend",
 ]
-version = "0.9.1"
+version = "0.9.3"

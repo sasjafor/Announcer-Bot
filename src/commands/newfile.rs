@@ -194,7 +194,7 @@ pub async fn newfile(ctx: &Context, message: &Message, args: Args) -> CommandRes
 
     let normalize_and_filter_string;
     if filter_string.len() > 0 {
-        normalize_and_filter_string = format!("loudnorm,{}", &filter_string);
+        normalize_and_filter_string = format!("{},loudnorm", &filter_string);
     } else {
         normalize_and_filter_string = "loudnorm".to_string();
     }

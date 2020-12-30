@@ -385,7 +385,7 @@ async fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, name:
 
         let count = files.unwrap().count();
         if random && count > 0 {
-            let index = rand::thread_rng().gen_range(0, count);
+            let index = rand::thread_rng().gen_range(0..count);
             let mut paths = read_dir(&index_base_path).unwrap();
             path = paths.nth(index).unwrap().unwrap().path().to_str().unwrap().to_owned();
         } else {
