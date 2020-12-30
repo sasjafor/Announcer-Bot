@@ -190,7 +190,7 @@ impl EventHandler for Handler {
         if !is_bot && !new_state.self_mute {
             info!("UNMUTE!");
 
-            let member = match guild_id.member(&ctx, user_id).await {
+            let member = match guild_id.member(&ctx.http, user_id).await {
                 Ok(member) => member,
                 Err(e) => {
                     error!("Member not found: {:?}", e);
