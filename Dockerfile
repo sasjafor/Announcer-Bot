@@ -1,7 +1,28 @@
-FROM rust:1.47
+FROM rust:1.52 as builder
 
-# Install rust toolchain
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+# Create empty shell project
+RUN USER=root cargo new --bin announcer_bot
+
+WORKDIR /announcer_bot
+
+# Copy manifest
+COPY ./Cargo.toml ./Cargo.toml
+
+# Build dependencies
+RUN RUSTFLAGS='-C link-arg=-s' cargo build --release
+
+RUN rm src/*.rs
+
+ADD . ./
+
+# Build for release
+RUN rm ./target/release/deps/announcer_bot*
+RUN RUSTFLAGS='-C link-arg=-s' cargo build --release
+
+FROM debian:buster-slim
+
+# Set log level
+ENV RUST_LOG warn
 
 # Setup apt, install package dependencies and create /config
 RUN apt-get update && \
@@ -15,34 +36,11 @@ RUN apt-get update && \
                                                 && \
     mkdir /config
 
-# Create empty shell project
-RUN USER=root cargo new --bin announcer_bot
-
-WORKDIR /announcer_bot
-
-# Set log level
-ENV RUST_LOG warn
-
-# Copy manifest
-COPY ./Cargo.toml ./Cargo.toml
-
-# Build dependencies
-RUN cargo build --release
-RUN rm src/*.rs
-
 # Copy run script
 COPY src/run /bin
 
-# Copy source tree
-COPY ./src ./src
-
-# Build for release
-RUN rm ./target/release/deps/announcer_bot*
-RUN cargo build --release
-
 # Copy executable
-RUN mv ./target/release/announcer_bot /bin && \
-    rm -rf /announcer_bot
+COPY --from=builder /announcer_bot/target/release/announcer_bot /bin
 
 WORKDIR /
 
