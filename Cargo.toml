@@ -11,15 +11,16 @@ libsodium-sys = "0.2.6"
 url = "2.2.0"
 regex = "1.4.2"
 lazy_static = "1.4.0"
-rusqlite = "0.24.2"
+rusqlite = "0.25.1"
 rand = "0.8.0"
 tracing = "0.1"
 tracing-subscriber = "0.2"
-tracing-futures = "0.2" # needed so intrument works with async functions.
+tracing-futures = "0.2.5" # needed so intrument works with async functions.
+songbird = "0.1.6"
 
 [dependencies.tokio]
-version = "0.2.24"
-features = ["macros", "signal"]
+version = "1.0.1"
+features = ["macros", "signal", "rt-multi-thread"]
 
 [dependencies.serenity]
 default-features = false
@@ -36,4 +37,4 @@ features = [
     "voice",
     "native_tls_backend",
 ]
-version = "0.9.3"
+version = "0.10.5"

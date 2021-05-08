@@ -15,12 +15,16 @@ use std::{
     },
 };
 
+// This trait adds the `register_songbird` and `register_songbird_with` methods
+// to the client builder below, making it easy to install this voice client.
+// The voice client can be retrieved in any command using `songbird::get(ctx).await`.
+use songbird::SerenityInit;
+
 use serenity::{
     async_trait,
     client::{
         bridge::{
             gateway::ShardManager,
-            voice::ClientVoiceManager,
         },
         Client, 
         Context,
@@ -57,7 +61,6 @@ use serenity::{
         TypeMapKey,
         Mutex,
     },
-    voice,
 };
 
 use tracing::{debug, error, info};
@@ -85,11 +88,11 @@ impl TypeMapKey for ShardManagerContainer {
     type Value = Arc<Mutex<ShardManager>>;
 }
 
-struct VoiceManager;
+// struct VoiceManager;
 
-impl TypeMapKey for VoiceManager {
-    type Value = Arc<Mutex<ClientVoiceManager>>;
-}
+// impl TypeMapKey for VoiceManager {
+//     type Value = Arc<Mutex<ClientVoiceManager>>;
+// }
 
 struct Handler;
 
@@ -136,24 +139,39 @@ impl EventHandler for Handler {
         let maybe_channel_id = new_state.channel_id;
 
         if (&old_state).is_some() && maybe_channel_id.is_none() {
-            let data = &ctx.data.read().await;
-            let manager_lock = data
-                .get::<VoiceManager>()
-                .cloned()
-                .expect("Expected VoiceManager in ShareMap.");
+            // let data = &ctx.data.read().await;
+            // let manager_lock = data
+            //     .get::<VoiceManager>()
+            //     .cloned()
+            //     .expect("Expected VoiceManager in ShareMap.");
 
-            let mut manager = manager_lock.lock().await;
-            let maybe_handler = manager.get_mut(guild_id);
+            let manager = songbird::get(&ctx).await
+                .expect("Songbird Voice client placed in at initialisation.").clone();
+        
+            // let manager = manager.get(guild_id);
 
-            if maybe_handler.is_some() {
-                let handler = maybe_handler.unwrap();
+            let handler_lock = manager.get(guild_id);
 
-                let self_channel_id = handler.channel_id;
+            // let mut manager = manager_lock.lock().await;
+            // let maybe_handler = manager.get_mut(guild_id);
+
+            if handler_lock.is_some() {
+                // let handler = maybe_handler.unwrap();
+                let gaggi = handler_lock.unwrap();
+                let mut handler = gaggi.lock().await;
+
+                let self_channel_id = handler.current_channel();
 
                 if self_channel_id.is_some() {
-                    if voice_channel_is_empty(&ctx, &guild, self_channel_id.unwrap()).await {
-                        info!("Voice channel empty, leaving...");
-                        handler.leave();
+                    if voice_channel_is_empty(&ctx, &guild, ChannelId(self_channel_id.unwrap().0)).await {
+                        // if let Err(e) = manager.remove(guild_id).await {
+                        //     error!("Failed to leave channel: {:?}", e);
+                        //     return;
+                        // }
+
+                        
+                        let _ = handler.leave().await.expect("Failed to leave voice channel");
+                        info!("Left empty voice channel");
                         return;
                     }
                 }
@@ -272,12 +290,13 @@ async fn main() {
     let mut client = Client::builder(&token)
         .framework(framework)
         .event_handler(Handler)
+        .register_songbird()
         .await
         .expect("Err creating client");
 
     {
         let mut data = client.data.write().await;
-        data.insert::<VoiceManager>(client.voice_manager.clone());
+        // data.insert::<VoiceManager>(client.voice_manager.clone());
         data.insert::<ShardManagerContainer>(client.shard_manager.clone());
     }
 
@@ -401,33 +420,39 @@ async fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, name:
 }
 
 async fn play_file(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, path: &str) {
-    let manager_lock = &ctx
-        .data
-        .read()
-        .await
-        .get::<VoiceManager>()
-        .cloned()
-        .expect("Expected VoiceManager in ShareMap.");
-    let mut manager = manager_lock.lock().await;
+    // let manager_lock = &ctx
+    //     .data
+    //     .read()
+    //     .await
+    //     .get::<VoiceManager>()
+    //     .cloned()
+    //     .expect("Expected VoiceManager in ShareMap.");
+    // let mut manager = manager_lock.lock().await;
 
-    if let Some(old_handler) = manager.get_mut(guild_id) {
-        if let Some(old_channel_id) = old_handler.channel_id {
-            if old_channel_id != channel_id {
-                old_handler.stop();
-            }
-        }
-    }
+    // if let Some(old_handler) = manager.get_mut(guild_id) {
+    //     if let Some(old_channel_id) = old_handler.channel_id {
+    //         if old_channel_id != channel_id {
+    //             old_handler.stop();
+    //         }
+    //     }
+    // }
 
-    let handler = match manager.join(guild_id, channel_id) {
-        Some(handler) => handler,
-        None => {
-            error!("Joining voice channel");
-            return;
-        }
-    };
-    debug!("Joined {}", channel_id.mention());
+    let manager = songbird::get(ctx).await
+        .expect("Songbird Voice client placed in at initialisation.").clone();
 
-    let source = match voice::ffmpeg(path).await {
+    // let mut handler = if let Some(handler_lock) = manager.get(guild_id) {
+    //     handler_lock.lock().await
+    // } else {
+    //     manager.join(guild_id, channel_id).await;
+    //     let handler_lock = manager.get(guild_id).unwrap();
+    //     handler_lock.lock().await
+    // };
+
+    let _ = manager.join(guild_id, channel_id).await;
+    let handler_lock = manager.get(guild_id).unwrap();
+    let mut handler = handler_lock.lock().await;
+    
+    let source = match songbird::ffmpeg(path).await {
         Ok(source) => source,
         Err(err) => {
             error!("Err starting source: {:?}", err);
@@ -436,7 +461,16 @@ async fn play_file(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, path
     };
 
     info!("Playing sound file {}", path);
-    handler.play(source);
+    handler.play_source(source);
+
+    // let handler = match manager.join(guild_id, channel_id) {
+    //     Some(handler) => handler,
+    //     None => {
+    //         error!("Joining voice channel");
+    //         return;
+    //     }
+    // };
+    // debug!("Joined {}", channel_id.mention());
 }
 
 async fn voice_channel_is_empty(ctx: &Context, guild: &Guild, channel_id: ChannelId) -> bool {
