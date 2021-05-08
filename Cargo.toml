@@ -4,6 +4,12 @@ version = "0.3.0"
 authors = ["sasjafor <john93412@gmail.com>"]
 edition = "2018"
 
+[profile.release]
+lto = true
+panic = "abort"
+opt-level = 3
+codegen-units = 1
+
 [dependencies]
 log = "0.4.11"
 env_logger = "0.8.2"
