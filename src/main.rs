@@ -88,12 +88,6 @@ impl TypeMapKey for ShardManagerContainer {
     type Value = Arc<Mutex<ShardManager>>;
 }
 
-// struct VoiceManager;
-
-// impl TypeMapKey for VoiceManager {
-//     type Value = Arc<Mutex<ClientVoiceManager>>;
-// }
-
 struct Handler;
 
 #[async_trait]
@@ -139,37 +133,19 @@ impl EventHandler for Handler {
         let maybe_channel_id = new_state.channel_id;
 
         if (&old_state).is_some() && maybe_channel_id.is_none() {
-            // let data = &ctx.data.read().await;
-            // let manager_lock = data
-            //     .get::<VoiceManager>()
-            //     .cloned()
-            //     .expect("Expected VoiceManager in ShareMap.");
-
             let manager = songbird::get(&ctx).await
                 .expect("Songbird Voice client placed in at initialisation.").clone();
-        
-            // let manager = manager.get(guild_id);
 
             let handler_lock = manager.get(guild_id);
 
-            // let mut manager = manager_lock.lock().await;
-            // let maybe_handler = manager.get_mut(guild_id);
-
             if handler_lock.is_some() {
-                // let handler = maybe_handler.unwrap();
                 let gaggi = handler_lock.unwrap();
                 let mut handler = gaggi.lock().await;
 
                 let self_channel_id = handler.current_channel();
 
                 if self_channel_id.is_some() {
-                    if voice_channel_is_empty(&ctx, &guild, ChannelId(self_channel_id.unwrap().0)).await {
-                        // if let Err(e) = manager.remove(guild_id).await {
-                        //     error!("Failed to leave channel: {:?}", e);
-                        //     return;
-                        // }
-
-                        
+                    if voice_channel_is_empty(&ctx, &guild, ChannelId(self_channel_id.unwrap().0)).await {                        
                         let _ = handler.leave().await.expect("Failed to leave voice channel");
                         info!("Left empty voice channel");
                         return;
@@ -218,7 +194,7 @@ impl EventHandler for Handler {
 
             let name = member.display_name().to_string();
 
-            let _ = announce(&ctx, channel_id, guild_id, &name, *user_id.as_u64()).await;
+            let _ = announce(&ctx, channel_id, guild_id, &name, user_id.0).await;
             return;
         }
     }
@@ -414,44 +390,26 @@ async fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, name:
         path = format!("/config/audio/{}.wav", &name);
     }
 
+    debug!("id: {} , path: {}", user_id, &path);
+
     check_path(&path, &name);
+
+    debug!("id: {} , path: {}", user_id, &path);
 
     play_file(ctx, channel_id, guild_id, &path).await;
 }
 
 async fn play_file(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, path: &str) {
-    // let manager_lock = &ctx
-    //     .data
-    //     .read()
-    //     .await
-    //     .get::<VoiceManager>()
-    //     .cloned()
-    //     .expect("Expected VoiceManager in ShareMap.");
-    // let mut manager = manager_lock.lock().await;
-
-    // if let Some(old_handler) = manager.get_mut(guild_id) {
-    //     if let Some(old_channel_id) = old_handler.channel_id {
-    //         if old_channel_id != channel_id {
-    //             old_handler.stop();
-    //         }
-    //     }
-    // }
-
     let manager = songbird::get(ctx).await
         .expect("Songbird Voice client placed in at initialisation.").clone();
 
-    // let mut handler = if let Some(handler_lock) = manager.get(guild_id) {
-    //     handler_lock.lock().await
-    // } else {
-    //     manager.join(guild_id, channel_id).await;
-    //     let handler_lock = manager.get(guild_id).unwrap();
-    //     handler_lock.lock().await
-    // };
+    let handler_lock = match manager.get(guild_id) {
+        Some(lock) => lock,
+        None => manager.join(guild_id, channel_id).await.0
+    };
 
-    let _ = manager.join(guild_id, channel_id).await;
-    let handler_lock = manager.get(guild_id).unwrap();
     let mut handler = handler_lock.lock().await;
-    
+
     let source = match songbird::ffmpeg(path).await {
         Ok(source) => source,
         Err(err) => {
@@ -462,15 +420,6 @@ async fn play_file(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, path
 
     info!("Playing sound file {}", path);
     handler.play_source(source);
-
-    // let handler = match manager.join(guild_id, channel_id) {
-    //     Some(handler) => handler,
-    //     None => {
-    //         error!("Joining voice channel");
-    //         return;
-    //     }
-    // };
-    // debug!("Joined {}", channel_id.mention());
 }
 
 async fn voice_channel_is_empty(ctx: &Context, guild: &Guild, channel_id: ChannelId) -> bool {
