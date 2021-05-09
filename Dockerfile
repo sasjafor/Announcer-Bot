@@ -26,7 +26,8 @@ ENV RUST_LOG warn
 
 # Setup apt, install package dependencies and create /config
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends  espeak \
+    apt-get install -y --no-install-recommends  ca-certificates \
+                                                espeak \
                                                 ffmpeg \
                                                 lame \
                                                 libopus0 \
