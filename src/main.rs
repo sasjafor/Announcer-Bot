@@ -454,7 +454,8 @@ fn check_path(path: &str, name: &str) {
             .expect("Failed to run espeak!");
         let text_path = format!("/config/queue/{}", &name);
 
-        fs::write(text_path, name).expect("Unable to write file");
+        let err_msg = format!("Unable to write file {} for name: {}", &text_path, &name);
+        fs::write(text_path, name).expect(&err_msg);
     }
 }
 
