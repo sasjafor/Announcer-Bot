@@ -192,7 +192,7 @@ impl EventHandler for Handler {
                 }
             };
 
-            let name = member.display_name().to_string();
+            let name = member.display_name().to_string().replace("/", "⁄");
 
             let _ = announce(&ctx, channel_id, guild_id, &name, user_id.0).await;
             return;
@@ -454,8 +454,13 @@ fn check_path(path: &str, name: &str) {
             .expect("Failed to run espeak!");
         let text_path = format!("/config/queue/{}", &name);
 
-        let err_msg = format!("Unable to write file {} for name: {}", &text_path, &name);
-        fs::write(text_path, name).expect(&err_msg);
+        let _ = match fs::write(&text_path, name) {
+            Ok(()) => (),
+            Err(err) => {
+                error!("Unable to write file {} for name: {} err: {}", &text_path, &name, &err);
+                return;
+            }
+        };
     }
 }
 
