@@ -59,6 +59,8 @@ pub async fn newfile(ctx: &Context, message: &Message, args: Args) -> CommandRes
         }
     };
 
+    debug!("Newfile command for name: {}", &name);
+
     if arguments.len() < 2 || (arguments.len() > 3 && arguments.len() < 5) {
         check_msg(message.channel_id.say(&ctx, "Please provide a name for this announcement").await);
         return Ok(());
@@ -130,8 +132,8 @@ pub async fn newfile(ctx: &Context, message: &Message, args: Args) -> CommandRes
             .expect("Failed to run youtube-dl");
 
         if !youtube_url.status.success() {
-            let _ = check_msg(message.channel_id.say(&ctx, "Youtube url error").await);
-            error!("Error for youtube url {}", url);
+            let _ = check_msg(message.channel_id.say(&ctx, "Youtube-dl Error: Likely needs an update").await);
+            error!("Error for youtube url {} err: {}", url, youtube_url.status);
             return Ok(())
         }
 

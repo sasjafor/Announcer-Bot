@@ -33,6 +33,7 @@ RUN apt-get update && \
                                                 libopus0 \
                                                 libsqlite3-dev \
                                                 libssl-dev \
+                                                python \
                                                 vorbis-tools \
                                                 && \
     mkdir /config

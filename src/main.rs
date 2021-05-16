@@ -258,9 +258,11 @@ async fn main() {
                 .prefix("!")
                 .allow_dm(false)
                 .case_insensitivity(true)
-                .allowed_channels(vec![ ChannelId(552168558323564544), 
-                                        ChannelId(511144158975623169),
-                                        ChannelId(739933045406171166)].into_iter().collect())
+                .allowed_channels(vec![ ChannelId(552168558323564544), // announcer-bot-submissions (Test server)
+                                        ChannelId(511144158975623169), // announcer-bot-submissions (Cupboard under the stairs)
+                                        ChannelId(780475875698409502), // test channel
+                                        ChannelId(739933045406171166)  //
+                                        ].into_iter().collect())
             );
 
     let mut client = Client::builder(&token)
