@@ -392,11 +392,7 @@ async fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, name:
         path = format!("/config/audio/{}.wav", &name);
     }
 
-    debug!("id: {} , path: {}", user_id, &path);
-
     check_path(&path, &name);
-
-    debug!("id: {} , path: {}", user_id, &path);
 
     play_file(ctx, channel_id, guild_id, &path).await;
 }
@@ -405,12 +401,29 @@ async fn play_file(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, path
     let manager = songbird::get(ctx).await
         .expect("Songbird Voice client placed in at initialisation.").clone();
 
-    let handler_lock = match manager.get(guild_id) {
-        Some(lock) => lock,
-        None => manager.join(guild_id, channel_id).await.0
-    };
-
+    let handler_lock = manager.get_or_insert(songbird::id::GuildId(guild_id.0));
     let mut handler = handler_lock.lock().await;
+
+    let songbird_channel_id = songbird::id::ChannelId(channel_id.0);
+    if handler.current_channel().is_none() || handler.current_channel().unwrap() != songbird_channel_id {
+        let handler_res = match handler.join(songbird_channel_id).await {
+            Ok(res) => res,
+            Err(err) => {
+                error!("Failed to connect to channel with id {} with err {}", channel_id, err);
+                return;
+            }
+        };
+        drop(handler);
+        let _ = match handler_res.await {
+            Ok(_res) => _res,
+            Err(err) => {
+                error!("Failed to connect to channel with id {} with err {}", channel_id, err);
+                return;
+            }
+        };
+    
+        handler = handler_lock.lock().await;
+    }
 
     let source = match songbird::ffmpeg(path).await {
         Ok(source) => source,
