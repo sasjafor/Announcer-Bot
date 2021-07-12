@@ -217,7 +217,7 @@ pub async fn set(ctx: &Context, message: &Message, args: Args) -> CommandResult 
     let msg_res = message.channel_id.send_message(&ctx, |m| {
         m.embed(|e| {
             e.title(format!("Set announcement"));
-            e.description(format!("**{}**: {} [{}]", &name, &filename, &message.author.mention()));
+            e.description(format!("`{}` [{}]", &filename, &message.author.mention()));
             e.colour(Colour::from_rgb(128,128,128));
 
             e
