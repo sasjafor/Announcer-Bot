@@ -24,7 +24,10 @@ use serenity::{
     async_trait,
     client::{
         bridge::{
-            gateway::ShardManager,
+            gateway::{
+                GatewayIntents,
+                ShardManager,
+            }
         },
         Client, 
         Context,
@@ -80,7 +83,12 @@ use commands::{
     manage::*,
 };
 
-use rand::Rng;
+use rand::{
+    distributions::{
+        Distribution,
+        Uniform
+    }
+};
 
 struct ShardManagerContainer;
 
@@ -268,13 +276,16 @@ async fn main() {
     let mut client = Client::builder(&token)
         .framework(framework)
         .event_handler(Handler)
+        .intents(   GatewayIntents::GUILD_MEMBERS |
+                    GatewayIntents::GUILD_MESSAGES |
+                    GatewayIntents::GUILD_VOICE_STATES |
+                    GatewayIntents::GUILDS)
         .register_songbird()
         .await
         .expect("Err creating client");
 
     {
         let mut data = client.data.write().await;
-        // data.insert::<VoiceManager>(client.voice_manager.clone());
         data.insert::<ShardManagerContainer>(client.shard_manager.clone());
     }
 
@@ -324,8 +335,8 @@ async fn main() {
         "CREATE TABLE IF NOT EXISTS names (
             name            TEXT NOT NULL, 
             user_id         INTEGER NOT NULL,
-            active_file     TEXT DEFAULT '',
-            random          INTEGER DEFAULT 0,
+            active_file     TEXT NOT NULL DEFAULT '',
+            random          INTEGER NOT NULL DEFAULT 0 CHECK(random IN(0, 1)),
             PRIMARY KEY ( name, user_id )
             )",
         params![]) {
@@ -382,7 +393,10 @@ async fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, name:
 
         let count = files.unwrap().count();
         if random && count > 0 {
-            let index = rand::thread_rng().gen_range(0..count);
+            let between = Uniform::from(0..count);
+            let mut rng = rand::thread_rng();
+            let index = between.sample(&mut rng);
+
             let mut paths = read_dir(&index_base_path).unwrap();
             path = paths.nth(index).unwrap().unwrap().path().to_str().unwrap().to_owned();
         } else {
