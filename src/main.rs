@@ -83,6 +83,8 @@ use commands::{
     manage::*,
 };
 
+use lib::check::can_connect;
+
 use rand::{
     distributions::{
         Distribution,
@@ -122,6 +124,11 @@ impl EventHandler for Handler {
             }
         };
 
+        let is_bot = user.bot;
+        if is_bot {
+            return;
+        }
+
         let guild_id = match guild_id {
             Some(guild_id) => guild_id,
             None => {
@@ -140,35 +147,36 @@ impl EventHandler for Handler {
 
         let maybe_channel_id = new_state.channel_id;
 
-        if (&old_state).is_some() && maybe_channel_id.is_none() {
-            let manager = songbird::get(&ctx).await
-                .expect("Songbird Voice client placed in at initialisation.").clone();
-
-            let handler_lock = manager.get(guild_id);
-
-            if handler_lock.is_some() {
-                let gaggi = handler_lock.unwrap();
-                let mut handler = gaggi.lock().await;
-
-                let self_channel_id = handler.current_channel();
-
-                if self_channel_id.is_some() {
-                    if voice_channel_is_empty(&ctx, &guild, ChannelId(self_channel_id.unwrap().0)).await {                        
-                        let _ = handler.leave().await.expect("Failed to leave voice channel");
-                        info!("Left empty voice channel");
-                        return;
+        if (&old_state).is_some() {
+            if maybe_channel_id.is_none() || !can_connect(&ctx, maybe_channel_id.unwrap()).await {
+                let manager = songbird::get(&ctx).await
+                    .expect("Songbird Voice client placed in at initialisation.").clone();
+    
+                let handler_lock = manager.get(guild_id);
+    
+                if handler_lock.is_some() {
+                    let gaggi = handler_lock.unwrap();
+                    let mut handler = gaggi.lock().await;
+    
+                    let self_channel_id = handler.current_channel();
+    
+                    if self_channel_id.is_some() {
+                        if voice_channel_is_empty(&ctx, &guild, ChannelId(self_channel_id.unwrap().0)).await {                        
+                            let _ = handler.leave().await.expect("Failed to leave voice channel");
+                            info!("Left empty voice channel");
+                            return;
+                        }
                     }
                 }
+                return;
+            } 
+        } else {
+            if maybe_channel_id.is_none() || !can_connect(&ctx, maybe_channel_id.unwrap()).await {
+                return;
             }
-        } 
 
-        
-        if maybe_channel_id.is_none() {
-            return;
-        }
-        let channel_id = maybe_channel_id.unwrap();
+            let channel_id = maybe_channel_id.unwrap();
 
-        if (&old_state).is_none() {
             let path = "/config/StGallerConnection.mp3";
             if user_id == USER1_ID {
                 let user_check = guild.voice_states.get(&USER2_ID);
@@ -185,11 +193,11 @@ impl EventHandler for Handler {
                     let _ = play_file(&ctx, channel_id, guild_id, &path).await;
                 }
             }
-        }
+        }        
+        
+        let channel_id = maybe_channel_id.unwrap();
 
-        let is_bot = user.bot;
-
-        if !is_bot && !new_state.self_mute {
+        if !new_state.self_mute {
             info!("UNMUTE!");
 
             let member = match guild_id.member(&ctx.http, user_id).await {
@@ -423,7 +431,7 @@ async fn play_file(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, path
         let handler_res = match handler.join(songbird_channel_id).await {
             Ok(res) => res,
             Err(err) => {
-                error!("Failed to connect to channel with id {} with err {}", channel_id, err);
+                error!("Failed to send connect request for channel with id {} with err {}", channel_id, err);
                 return;
             }
         };
