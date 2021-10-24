@@ -155,8 +155,8 @@ impl EventHandler for Handler {
                 let handler_lock = manager.get(guild_id);
     
                 if handler_lock.is_some() {
-                    let gaggi = handler_lock.unwrap();
-                    let mut handler = gaggi.lock().await;
+                    let handler_tmp = handler_lock.unwrap();
+                    let mut handler = handler_tmp.lock().await;
     
                     let self_channel_id = handler.current_channel();
     

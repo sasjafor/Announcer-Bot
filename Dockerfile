@@ -50,6 +50,6 @@ WORKDIR /
 ADD https://yt-dl.org/downloads/latest/youtube-dl /usr/local/bin/
 RUN chmod a+rx /usr/local/bin/youtube-dl
 
-# EXPOSE 8080
+# Set run command
 VOLUME /config
 CMD ["run"]
