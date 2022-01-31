@@ -69,7 +69,6 @@ use serenity::{
 use tracing::{debug, error, info};
 use tracing_subscriber::{
     FmtSubscriber,
-    EnvFilter,
 };
 
 use rusqlite::{
@@ -245,7 +244,6 @@ async fn main() {
     // In this case, a good default is setting the environment variable
     // `RUST_LOG` to debug`.
     let subscriber = FmtSubscriber::builder()
-        .with_env_filter(EnvFilter::from_default_env())
         .finish();
 
     tracing::subscriber::set_global_default(subscriber).expect("Failed to start the logger");
