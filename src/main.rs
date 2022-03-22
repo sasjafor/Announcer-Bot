@@ -275,7 +275,8 @@ async fn main() {
                 .allowed_channels(vec![ ChannelId(552168558323564544), // announcer-bot-submissions (Test server)
                                         ChannelId(511144158975623169), // announcer-bot-submissions (Cupboard under the stairs)
                                         ChannelId(780475875698409502), // test channel
-                                        ChannelId(739933045406171166)  //
+                                        ChannelId(739933045406171166), // gay-announcement (Rütlischwur Dudes)
+                                        ChannelId(955573958403571822)  // announcer-bot-submissions (Spielbande)
                                         ].into_iter().collect())
             );
 
