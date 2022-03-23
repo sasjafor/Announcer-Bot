@@ -19,7 +19,7 @@ ADD . ./
 RUN rm ./target/release/deps/announcer_bot*
 RUN RUSTFLAGS='-C link-arg=-s' cargo build --release
 
-FROM debian:buster-slim
+FROM debian:bookworm-slim
 
 # Set log level
 ENV RUST_LOG warn
@@ -33,7 +33,7 @@ RUN apt-get update && \
                                                 libopus0 \
                                                 libsqlite3-dev \
                                                 libssl-dev \
-                                                python \
+                                                python-is-python3 \
                                                 vorbis-tools \
                                                 && \
     mkdir /config
