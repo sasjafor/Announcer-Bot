@@ -2,7 +2,7 @@
 name = "announcer_bot"
 version = "0.3.0"
 authors = ["sasjafor <john93412@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [profile.release]
 lto = true
@@ -18,7 +18,7 @@ url = "2.2.2"
 regex = "1.5.5"
 lazy_static = "1.4.0"
 rusqlite = "0.27.0"
-rand = "0.8.4"
+rand = "0.8.5"
 tracing = "0.1.32"
 tracing-subscriber = "0.3.9"
 tracing-futures = "0.2.5" # needed so intrument works with async functions.
