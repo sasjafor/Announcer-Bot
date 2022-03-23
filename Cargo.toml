@@ -2,7 +2,7 @@
 name = "announcer_bot"
 version = "0.3.0"
 authors = ["sasjafor <sascha.forster@hotmail.ch>"]
-edition = "2021"
+edition = "2018"
 
 [profile.release]
 lto = true
