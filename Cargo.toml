@@ -1,7 +1,7 @@
 [package]
 name = "announcer_bot"
 version = "0.3.0"
-authors = ["sasjafor <john93412@gmail.com>"]
+authors = ["sasjafor <sascha.forster@hotmail.ch>"]
 edition = "2021"
 
 [profile.release]
