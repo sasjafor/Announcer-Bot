@@ -1,2 +1,4 @@
 pub mod newfile;
-pub mod manage;
+pub mod list;
+pub mod random;
+pub mod set;
