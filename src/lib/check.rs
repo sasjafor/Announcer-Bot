@@ -12,13 +12,13 @@ use serenity::{
 
 /// Checks if user can connect to a voice channel
 pub async fn can_connect(ctx: &Context, channel_id: ChannelId) -> bool {
-    let channel = match ctx.cache.guild_channel(channel_id).await {
+    let channel = match ctx.cache.guild_channel(channel_id) {
         Some(channel) => channel,
         None => return false,
     };
 
-    let current_user_id = ctx.cache.current_user().await.id;
-    if let Ok(permissions) = channel.permissions_for_user(&ctx.cache, current_user_id).await {
+    let current_user_id = ctx.cache.current_user().id;
+    if let Ok(permissions) = channel.permissions_for_user(&ctx.cache, current_user_id) {
         if permissions.contains(Permissions::CONNECT) {
             return true;
         }

@@ -25,7 +25,6 @@ use serenity::{
     client::{
         bridge::{
             gateway::{
-                GatewayIntents,
                 ShardManager,
             }
         },
@@ -109,7 +108,7 @@ impl EventHandler for Handler {
         info!("Resumed");
     }
 
-    async fn voice_state_update(&self, ctx: Context, guild_id: Option<GuildId>, old_state: Option<VoiceState>, new_state: VoiceState) {
+    async fn voice_state_update(&self, ctx: Context, old_state: Option<VoiceState>, new_state: VoiceState) {
         const USER1_ID: UserId = UserId(239705630913331201); // demain
         const USER2_ID: UserId = UserId(180995420196044809); // seschu
 
@@ -128,7 +127,7 @@ impl EventHandler for Handler {
             return;
         }
 
-        let guild_id = match guild_id {
+        let guild_id = match new_state.guild_id {
             Some(guild_id) => guild_id,
             None => {
                 info!("Guild id not found.");
@@ -136,7 +135,7 @@ impl EventHandler for Handler {
             }
         };
 
-        let guild = match guild_id.to_guild_cached(&ctx).await {
+        let guild = match guild_id.to_guild_cached(&ctx) {
             Some(guild) => guild,
             None => {
                 info!("Guild not found in cache.");
@@ -251,7 +250,7 @@ async fn main() {
     // Login with a bot token from the environment
     let token = env::var("DISCORD_APP_AUTH_TOKEN").expect("Expected a token in the environment");
 
-    let http = Http::new_with_token(&token);
+    let http = Http::new(&token);
 
     // We will fetch your bot's owners and id
     let (_owners, _bot_id) = match http.get_current_application_info().await {
@@ -280,13 +279,13 @@ async fn main() {
                                         ].into_iter().collect())
             );
 
-    let mut client = Client::builder(&token)
+    let intents =   GatewayIntents::GUILD_MEMBERS |
+                                    GatewayIntents::GUILD_MESSAGES |
+                                    GatewayIntents::GUILD_VOICE_STATES |
+                                    GatewayIntents::GUILDS;
+    let mut client = Client::builder(&token, intents)
         .framework(framework)
         .event_handler(Handler)
-        .intents(   GatewayIntents::GUILD_MEMBERS |
-                    GatewayIntents::GUILD_MESSAGES |
-                    GatewayIntents::GUILD_VOICE_STATES |
-                    GatewayIntents::GUILDS)
         .register_songbird()
         .await
         .expect("Err creating client");
