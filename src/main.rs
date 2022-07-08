@@ -74,6 +74,8 @@ use rusqlite::{
 use commands::{
     newfile::*,
     list::*,
+    random::*,
+    set::*,
 };
 
 use lib::check::can_connect;

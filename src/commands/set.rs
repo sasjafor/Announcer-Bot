@@ -30,8 +30,6 @@ use rusqlite::{
 
 use crate::lib::msg::check_msg;
 
-const EMBED_DESCRIPTION_MAX_LENGTH: usize = 4096;
-
 #[command]
 #[aliases("setactive", "set_active")]
 #[description("Set the active announcement for the current nickname")]
