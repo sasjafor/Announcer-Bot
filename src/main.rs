@@ -1,16 +1,12 @@
-mod lib;
 mod commands;
+mod lib;
 
 use std::{
     collections::HashSet,
-    env, 
-    fs::{
-        self,
-    }, 
-    path::Path, 
-    sync::{
-        Arc,
-    },
+    env,
+    fs::{self},
+    path::Path,
+    sync::Arc,
 };
 
 // This trait adds the `register_songbird` and `register_songbird_with` methods
@@ -20,67 +16,38 @@ use songbird::SerenityInit;
 
 use serenity::{
     async_trait,
-    client::{
-        bridge::{
-            gateway::{
-                ShardManager,
-            }
-        },
-        Client, 
-        Context,
-        EventHandler
-    },
+    client::{bridge::gateway::ShardManager, Client, Context, EventHandler},
     framework::{
         standard::{
-            Args,
-            CommandGroup,
-            CommandResult,
-            HelpOptions,
             help_commands,
-            macros::{
-                group,
-                help,
-            }, 
+            macros::{group, help},
+            Args, CommandGroup, CommandResult, HelpOptions,
         },
-        StandardFramework
+        StandardFramework,
     },
     http::Http,
     model::{
-        event::ResumedEvent, 
-        gateway::Ready, 
-        id::{
-            ChannelId,
-            UserId,
-        }, 
+        event::ResumedEvent,
+        gateway::Ready,
+        id::{ChannelId, UserId},
+        interactions::application_command::{
+            ApplicationCommand, ApplicationCommandInteractionDataOptionValue,
+        },
         prelude::*,
         voice::VoiceState,
     },
-    prelude::{
-        TypeMapKey,
-        Mutex,
-    },
+    prelude::{Mutex, TypeMapKey},
 };
 
-use tracing::{error, info};
-use tracing_subscriber::{
-    FmtSubscriber,
-};
+use tracing::{debug, error, info};
 
-use rusqlite::{
-    Connection,
-    params,
-};
+use rusqlite::{params, Connection};
 
-use commands::{
-    newfile::*,
-    list::*,
-    random::*,
-    set::*,
-};
+use commands::{list::*, newfile::*, random::*, set::*};
 
 use lib::check::can_connect;
 
-use crate::lib::util::{voice_channel_is_empty, play_file, print_type_of, announce};
+use crate::lib::util::{announce, play_file, print_type_of, voice_channel_is_empty};
 
 struct ShardManagerContainer;
 
@@ -92,15 +59,75 @@ struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, _: Context, ready: Ready) {
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Interaction::ApplicationCommand(command) = interaction {
+            debug!("Received slash command: {:#?}", command.data.name);
+
+            let (content, embed) = match command.data.name.as_str() {
+                "list" => {
+                    let options = command
+                        .data
+                        .options
+                        .get(0)
+                        .expect("Expected name argument")
+                        .resolved
+                        .as_ref()
+                        .expect("Expected name string");
+
+                    if let ApplicationCommandInteractionDataOptionValue::String(name) = options {
+                        list(&ctx, &command.user, name).await
+                    } else {
+                        ("Please provide a valid name.".to_string(), None)
+                    }
+                }
+                _ => ("Command not implemented".to_string(), None),
+            };
+
+            if let Err(why) = command
+                .create_interaction_response(&ctx.http, |response| {
+                    response
+                        .kind(InteractionResponseType::ChannelMessageWithSource)
+                        .interaction_response_data(|message| {
+                            message
+                            .content(content);
+                            if let Some(e) = embed {
+                                message.add_embed(e);
+                            }
+                            message
+                })
+                })
+                .await
+            {
+                error!("Couldn't respond to slash command: {}", why);
+            }
+        }
+    }
+
+    async fn ready(&self, ctx: Context, ready: Ready) {
         info!("Connected as {}", ready.user.name);
+
+        let guild_command =
+            ApplicationCommand::create_global_application_command(&ctx.http, create_list_command)
+                .await;
+        
+        if let Ok(gc) = guild_command {
+            debug!("Created global slash command: {:#?}", gc.name);
+        } else {
+            error!("Failed to create global slash command: {:?}", guild_command.err());
+        }
+        
     }
 
     async fn resume(&self, _: Context, _: ResumedEvent) {
         info!("Resumed");
     }
 
-    async fn voice_state_update(&self, ctx: Context, old_state: Option<VoiceState>, new_state: VoiceState) {
+    async fn voice_state_update(
+        &self,
+        ctx: Context,
+        old_state: Option<VoiceState>,
+        new_state: VoiceState,
+    ) {
         const USER1_ID: UserId = UserId(239705630913331201); // demain
         const USER2_ID: UserId = UserId(180995420196044809); // seschu
 
@@ -139,27 +166,38 @@ impl EventHandler for Handler {
 
         if (&old_state).is_some() {
             if maybe_channel_id.is_none() || !can_connect(&ctx, maybe_channel_id.unwrap()).await {
-                let manager = songbird::get(&ctx).await
-                    .expect("Songbird Voice client placed in at initialisation.").clone();
-    
+                let manager = songbird::get(&ctx)
+                    .await
+                    .expect("Songbird Voice client placed in at initialisation.")
+                    .clone();
+
                 let handler_lock = manager.get(guild_id);
-    
+
                 if handler_lock.is_some() {
                     let handler_tmp = handler_lock.unwrap();
                     let mut handler = handler_tmp.lock().await;
-    
+
                     let self_channel_id = handler.current_channel();
-    
+
                     if self_channel_id.is_some() {
-                        if voice_channel_is_empty(&ctx, &guild, ChannelId(self_channel_id.unwrap().0)).await {                        
-                            let _ = handler.leave().await.expect("Failed to leave voice channel");
+                        if voice_channel_is_empty(
+                            &ctx,
+                            &guild,
+                            ChannelId(self_channel_id.unwrap().0),
+                        )
+                        .await
+                        {
+                            let _ = handler
+                                .leave()
+                                .await
+                                .expect("Failed to leave voice channel");
                             info!("Left empty voice channel");
                             return;
                         }
                     }
                 }
                 return;
-            } 
+            }
         } else {
             if maybe_channel_id.is_none() || !can_connect(&ctx, maybe_channel_id.unwrap()).await {
                 return;
@@ -170,7 +208,7 @@ impl EventHandler for Handler {
             let path = "/config/StGallerConnection.mp3";
             if user_id == USER1_ID {
                 let user_check = guild.voice_states.get(&USER2_ID);
-                    
+
                 if user_check.is_some() && user_check.unwrap().channel_id == Some(channel_id) {
                     let _ = play_file(&ctx, channel_id, guild_id, &path).await;
                 }
@@ -178,13 +216,13 @@ impl EventHandler for Handler {
 
             if user_id == USER2_ID {
                 let user_check = guild.voice_states.get(&USER1_ID);
-                    
+
                 if user_check.is_some() && user_check.unwrap().channel_id == Some(channel_id) {
                     let _ = play_file(&ctx, channel_id, guild_id, &path).await;
                 }
             }
-        }        
-        
+        }
+
         let channel_id = maybe_channel_id.unwrap();
 
         if !new_state.self_mute {
@@ -207,7 +245,7 @@ impl EventHandler for Handler {
 }
 
 #[group]
-#[commands(newfile, list, set, random)]
+#[commands(newfile, list_old, set, random)]
 #[only_in("guilds")]
 #[help_available]
 struct General;
@@ -222,7 +260,7 @@ async fn my_help(
     args: Args,
     help_options: &'static HelpOptions,
     groups: &[&'static CommandGroup],
-    owners: HashSet<UserId>
+    owners: HashSet<UserId>,
 ) -> CommandResult {
     let _ = help_commands::plain(context, msg, args, help_options, groups, owners).await;
     Ok(())
@@ -230,14 +268,15 @@ async fn my_help(
 
 #[tokio::main]
 async fn main() {
-    // Initialize the logger to use environment variables.
+    // Call tracing_subscriber's initialize function, which configures `tracing`
+    // via environment variables.
     //
-    // In this case, a good default is setting the environment variable
-    // `RUST_LOG` to debug`.
-    let subscriber = FmtSubscriber::builder()
-        .finish();
-
-    tracing::subscriber::set_global_default(subscriber).expect("Failed to start the logger");
+    // For example, you can say to log all levels INFO and up via setting the
+    // environment variable `RUST_LOG` to `INFO`.
+    //
+    // This environment variable is already preset if you use cargo-make to run
+    // the example.
+    tracing_subscriber::fmt::init();
 
     // Login with a bot token from the environment
     let token = env::var("DISCORD_APP_AUTH_TOKEN").expect("Expected a token in the environment");
@@ -251,30 +290,35 @@ async fn main() {
             owners.insert(info.owner.id);
 
             (owners, info.id)
-        },
+        }
         Err(why) => panic!("Could not access application info: {:?}", why),
     };
 
     // Create the framework
     let framework = StandardFramework::new()
         .group(&GENERAL_GROUP)
-            .help(&MY_HELP)
-            .configure(|c| c
-                .prefix("!")
+        .help(&MY_HELP)
+        .configure(|c| {
+            c.prefix("!")
                 .allow_dm(false)
                 .case_insensitivity(true)
-                .allowed_channels(vec![ ChannelId(552168558323564544), // announcer-bot-submissions (Test server)
-                                        ChannelId(511144158975623169), // announcer-bot-submissions (Cupboard under the stairs)
-                                        ChannelId(780475875698409502), // test channel
-                                        ChannelId(739933045406171166), // gay-announcement (Rütlischwur Dudes)
-                                        ChannelId(955573958403571822)  // announcer-bot-submissions (Spielbande)
-                                        ].into_iter().collect())
-            );
+                .allowed_channels(
+                    vec![
+                        ChannelId(552168558323564544), // announcer-bot-submissions (Test server)
+                        ChannelId(511144158975623169), // announcer-bot-submissions (Cupboard under the stairs)
+                        ChannelId(780475875698409502), // test channel
+                        ChannelId(739933045406171166), // gay-announcement (Rütlischwur Dudes)
+                        ChannelId(955573958403571822), // announcer-bot-submissions (Spielbande)
+                    ]
+                    .into_iter()
+                    .collect(),
+                )
+        });
 
-    let intents =   GatewayIntents::GUILD_MEMBERS |
-                                    GatewayIntents::GUILD_MESSAGES |
-                                    GatewayIntents::GUILD_VOICE_STATES |
-                                    GatewayIntents::GUILDS;
+    let intents = GatewayIntents::GUILD_MEMBERS
+        | GatewayIntents::GUILD_MESSAGES
+        | GatewayIntents::GUILD_VOICE_STATES
+        | GatewayIntents::GUILDS;
     let mut client = Client::builder(&token, intents)
         .framework(framework)
         .event_handler(Handler)
@@ -290,7 +334,9 @@ async fn main() {
     let shard_manager = client.shard_manager.clone();
 
     tokio::spawn(async move {
-        tokio::signal::ctrl_c().await.expect("Could not register ctrl+c handler");
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Could not register ctrl+c handler");
         shard_manager.lock().await.shutdown_all().await;
     });
 
@@ -337,13 +383,14 @@ async fn main() {
             random          INTEGER NOT NULL DEFAULT 0 CHECK(random IN(0, 1)),
             PRIMARY KEY ( name, user_id )
             )",
-        params![]) {
-            Ok(_) => (),
-            Err(err) => {
-                print_type_of(&err);
-                error!("Failed to create table, Error Code: {}", err);
-                return;
-            }
+        params![],
+    ) {
+        Ok(_) => (),
+        Err(err) => {
+            print_type_of(&err);
+            error!("Failed to create table, Error Code: {}", err);
+            return;
+        }
     };
 
     // start listening for events by starting a single shard
