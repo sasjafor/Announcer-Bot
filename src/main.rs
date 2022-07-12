@@ -9,6 +9,7 @@ use std::{
     sync::Arc,
 };
 
+use regex::Regex;
 // This trait adds the `register_songbird` and `register_songbird_with` methods
 // to the client builder below, making it easy to install this voice client.
 // The voice client can be retrieved in any command using `songbird::get(ctx).await`.
@@ -30,8 +31,11 @@ use serenity::{
         event::ResumedEvent,
         gateway::Ready,
         id::{ChannelId, UserId},
-        interactions::application_command::{
-            ApplicationCommand, ApplicationCommandInteractionDataOptionValue,
+        interactions::{
+            application_command::{
+                ApplicationCommand, ApplicationCommandInteractionDataOptionValue,
+            },
+            message_component::ComponentType,
         },
         prelude::*,
         voice::VoiceState,
@@ -63,24 +67,50 @@ impl EventHandler for Handler {
         if let Interaction::ApplicationCommand(command) = interaction {
             debug!("Received slash command: {:#?}", command.data.name);
 
-            let (content, embed) = match command.data.name.as_str() {
+            let (content, embed, components) = match command.data.name.as_str() {
                 "list" => {
-                    let options = command
-                        .data
-                        .options
-                        .get(0)
-                        .expect("Expected name argument")
-                        .resolved
-                        .as_ref()
-                        .expect("Expected name string");
+                    let options = &command.data.options;
 
-                    if let ApplicationCommandInteractionDataOptionValue::String(name) = options {
-                        list(&ctx, &command.user, name).await
-                    } else {
-                        ("Please provide a valid name.".to_string(), None)
+                    let mut name_arg: Option<String> = None;
+                    let mut index_arg: Option<usize> = None;
+                    for arg in options {
+                        let arg_val = arg.resolved.as_ref().expect("Expected object").to_owned();
+                        match arg.name.as_str() {
+                            "name" => {
+                                if let ApplicationCommandInteractionDataOptionValue::String(
+                                    string_val,
+                                ) = arg_val
+                                {
+                                    name_arg = Some(string_val);
+                                }
+                            }
+                            "index" => {
+                                if let ApplicationCommandInteractionDataOptionValue::Integer(
+                                    int_val,
+                                ) = arg_val
+                                {
+                                    index_arg = Some(int_val as usize);
+                                }
+                            }
+                            _ => (),
+                        }
                     }
+
+                    let name = match name_arg {
+                        Some(name_val) => name_val,
+                        None => {
+                            if let Some(member) = command.member.clone() {
+                                member.display_name().into_owned()
+                            } else {
+                                command.user.name.clone()
+                            }
+                        }
+                    };
+                    let index = index_arg.unwrap_or(1);
+
+                    list(&ctx, &command.user, &name, index).await
                 }
-                _ => ("Command not implemented".to_string(), None),
+                _ => ("Command not implemented".to_string(), None, None),
             };
 
             if let Err(why) = command
@@ -88,18 +118,90 @@ impl EventHandler for Handler {
                     response
                         .kind(InteractionResponseType::ChannelMessageWithSource)
                         .interaction_response_data(|message| {
-                            message
-                            .content(content);
+                            message.content(content);
                             if let Some(e) = embed {
                                 message.add_embed(e);
                             }
+                            if let Some(c) = components {
+                                message.set_components(c);
+                            }
                             message
-                })
+                        })
                 })
                 .await
             {
                 error!("Couldn't respond to slash command: {}", why);
             }
+        } else if let Interaction::MessageComponent(mut component) = interaction {
+            debug!("Received message component interaction");
+
+            let footer_text = component
+                .message
+                .embeds
+                .get(0)
+                .expect("Embed is missing.")
+                .footer
+                .as_ref()
+                .expect("Footer is missing from list embed.")
+                .text
+                .clone();
+
+            let re_idx = Regex::new(r"Page ([0-9]+)/[0-9]+").unwrap();
+            let re_match = re_idx
+                .captures(&footer_text)
+                .expect("Couldn't match page index with regex.")
+                .get(1)
+                .expect("No matches.")
+                .as_str();
+            let mut index = re_match.parse::<usize>().expect("Failed to parse int.");
+            index = match component.data.component_type {
+                ComponentType::Button => match component.data.custom_id.as_str() {
+                    "Prev Button" => index - 1,
+                    "Next Button" => index + 1,
+                    _ => index,
+                },
+                _ => index,
+            };
+
+            let title_text = component
+                .message
+                .embeds
+                .get(0)
+                .expect("Embed is missing.")
+                .title
+                .as_ref()
+                .expect("Title is missing from list embed.")
+                .clone();
+            let re_name = Regex::new(r#"Announcements for "(.+)""#).unwrap();
+            let name = re_name
+                .captures(&title_text)
+                .expect("Couldn't match announcement name with regex.")
+                .get(1)
+                .expect("No matches.")
+                .as_str()
+                .to_owned();
+
+            let (content, embed, components) = list(&ctx, &component.user, &name, index).await;
+
+            if let Err(why) = component
+                .create_interaction_response(&ctx.http, |response| {
+                    response
+                        .kind(InteractionResponseType::UpdateMessage)
+                        .interaction_response_data(|message| {
+                            message.content(content);
+                            if let Some(e) = embed {
+                                message.set_embed(e);
+                            }
+                            if let Some(c) = components {
+                                message.set_components(c);
+                            }
+                            message
+                        })
+                })
+                .await
+            {
+                error!("Couldn't edit message: {}", why);
+            };
         }
     }
 
@@ -109,13 +211,15 @@ impl EventHandler for Handler {
         let guild_command =
             ApplicationCommand::create_global_application_command(&ctx.http, create_list_command)
                 .await;
-        
+
         if let Ok(gc) = guild_command {
             debug!("Created global slash command: {:#?}", gc.name);
         } else {
-            error!("Failed to create global slash command: {:?}", guild_command.err());
+            error!(
+                "Failed to create global slash command: {:?}",
+                guild_command.err()
+            );
         }
-        
     }
 
     async fn resume(&self, _: Context, _: ResumedEvent) {
@@ -245,7 +349,7 @@ impl EventHandler for Handler {
 }
 
 #[group]
-#[commands(newfile, list_old, set, random)]
+#[commands(newfile, set, random)]
 #[only_in("guilds")]
 #[help_available]
 struct General;

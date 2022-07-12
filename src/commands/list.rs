@@ -1,10 +1,14 @@
 use std::{ffi::OsStr, fs, path::Path};
 
 use serenity::{
-    builder::{CreateApplicationCommand, CreateEmbed},
+    builder::{CreateApplicationCommand, CreateComponents, CreateEmbed},
     client::Context,
-    framework::standard::{macros::command, Args, CommandResult},
-    model::{interactions::application_command::ApplicationCommandOptionType, prelude::*},
+    model::{
+        interactions::{
+            application_command::ApplicationCommandOptionType, message_component::ButtonStyle,
+        },
+        prelude::*,
+    },
     utils::Colour,
 };
 
@@ -12,9 +16,8 @@ use tracing::error;
 
 use rusqlite::{params, Connection, OptionalExtension};
 
-use crate::lib::msg::check_msg;
-
 const EMBED_DESCRIPTION_MAX_LENGTH: usize = 4096;
+const ELEMENTS_PER_PAGE: usize = 10;
 
 pub fn create_list_command(
     command: &mut CreateApplicationCommand,
@@ -27,35 +30,22 @@ pub fn create_list_command(
                 .name("name")
                 .description("The name for which to list announcements.")
                 .kind(ApplicationCommandOptionType::String)
-                .required(true)
+        })
+        .create_option(|option| {
+            option
+            .name("index")
+            .description("The page index.")
+            .kind(ApplicationCommandOptionType::Integer)
+            .min_int_value(1)
         });
 }
 
-#[command]
-#[description("List all available announcements for a name")]
-#[usage("<discordname>")]
-#[example("")]
-#[example("Yzarul")]
-#[example("\"Mr Yzarul\"")]
-#[min_args(0)]
-#[max_args(1)]
-#[help_available]
-pub async fn list_old(ctx: &Context, message: &Message, args: Args) -> CommandResult {
-    let arguments = args.raw_quoted().collect::<Vec<&str>>();
-
-    let option_nick = &message.author_nick(&ctx).await;
-    let name = match arguments.first() {
-        Some(name) => *name,
-        None => match option_nick {
-            Some(nick) => nick,
-            None => &message.author.name,
-        },
-    };
-
-    return Ok(());
-}
-
-pub async fn list(ctx: &Context, user: &User, name: &String) -> (String, Option<CreateEmbed>) {
+pub async fn list(
+    _ctx: &Context,
+    user: &User,
+    name: &String,
+    index: usize,
+) -> (String, Option<CreateEmbed>, Option<CreateComponents>) {
     let path_string = format!("/config/index/{}", &name);
     let path = Path::new(&path_string);
 
@@ -66,7 +56,7 @@ pub async fn list(ctx: &Context, user: &User, name: &String) -> (String, Option<
         Err(err) => {
             let err_str = "Failed to open database:".to_string();
             error!("{} {}", err_str, err);
-            return (err_str, None);
+            return (err_str, None, None);
         }
     };
 
@@ -82,19 +72,33 @@ pub async fn list(ctx: &Context, user: &User, name: &String) -> (String, Option<
         Err(err) => {
             let err_str = format!("Failed to query active file for {}", name);
             error!("{}, Error Code {}", err_str, err);
-            return (err_str, None);
+            return (err_str, None, None);
         }
     };
 
     if path.is_dir() {
-        let dir_iterator = match fs::read_dir(path) {
+        let mut dir_iterator = match fs::read_dir(path) {
             Ok(dir_iterator) => dir_iterator,
             Err(err) => {
                 let err_str = format!("Failed to read directory {}", path_string);
                 error!("{}, Error: {}", err_str, err);
-                return (err_str, None);
+                return (err_str, None, None);
             }
         };
+        // count elements and then recreate iterator
+        let entry_count = dir_iterator.count();
+        dir_iterator = match fs::read_dir(path) {
+            Ok(dir_iterator) => dir_iterator,
+            Err(err) => {
+                let err_str = format!("Failed to read directory {}", path_string);
+                error!("{}, Error: {}", err_str, err);
+                return (err_str, None, None);
+            }
+        };
+        let last_page_index = (entry_count as f64 / ELEMENTS_PER_PAGE as f64).ceil() as usize;
+        if index > last_page_index {
+            return ("Index too large, provide a valid index.".to_string(), None, None);
+        }
 
         let mut active_filename = None;
         let active_filename_str;
@@ -105,13 +109,20 @@ pub async fn list(ctx: &Context, user: &User, name: &String) -> (String, Option<
 
         let mut msg_len = 0;
         let mut msg_str = "".to_string();
+        let mut count = 0;
+        let start_pos = (index - 1) * ELEMENTS_PER_PAGE;
         for entry in dir_iterator {
+            if count < start_pos {
+                count += 1;
+                continue;
+            }
+
             let entry_value = match entry {
                 Ok(entry) => entry,
                 Err(err) => {
                     let err_str = "Failed to get next entry".to_string();
                     error!("{}, Error: {}", err_str, err);
-                    return (err_str, None);
+                    return (err_str, None, None);
                 }
             };
             let mut line_str = "".to_owned();
@@ -134,24 +145,28 @@ pub async fn list(ctx: &Context, user: &User, name: &String) -> (String, Option<
 
             let line_len = line_str.chars().count();
             // TODO: create pages if embed too long
-            if msg_len + line_len > EMBED_DESCRIPTION_MAX_LENGTH {
+            if count - start_pos > ELEMENTS_PER_PAGE {
                 break;
-            //     let msg_res = message.channel_id.send_message(&ctx, |m| {
-            //         m.embed(|e| {
-            //             e.title(format!("Announcements for \"{}\"", &name));
-            //             e.description(msg_str);
-            //             e.colour(Colour::from_rgb(128, 128, 128));
-
-            //             e
-            //         });
-
-            //         m
-            //     });
-            //     check_msg(msg_res.await);
-
-            //     msg_str = "".to_string();
-            //     msg_len = 0;
             }
+            count += 1;
+            // if msg_len + line_len > EMBED_DESCRIPTION_MAX_LENGTH {
+            //     break;
+            //     //     let msg_res = message.channel_id.send_message(&ctx, |m| {
+            //     //         m.embed(|e| {
+            //     //             e.title(format!("Announcements for \"{}\"", &name));
+            //     //             e.description(msg_str);
+            //     //             e.colour(Colour::from_rgb(128, 128, 128));
+
+            //     //             e
+            //     //         });
+
+            //     //         m
+            //     //     });
+            //     //     check_msg(msg_res.await);
+
+            //     //     msg_str = "".to_string();
+            //     //     msg_len = 0;
+            // }
 
             msg_str.push_str("\n");
             msg_str.push_str(&line_str);
@@ -169,11 +184,40 @@ pub async fn list(ctx: &Context, user: &User, name: &String) -> (String, Option<
         embed
             .title(format!("Announcements for \"{}\"", &name))
             .description(msg_str)
-            .colour(Colour::from_rgb(128, 128, 128));
+            .colour(Colour::from_rgb(128, 128, 128))
+            .footer(|footer| {
+                footer.text(format!("Page {}/{}", index, last_page_index))
+            });
 
-        ("".to_string(), Some(embed))
+        let mut components = CreateComponents::default();
+        components.create_action_row(|row| {
+            row.create_button(|button| {
+                button
+                    .custom_id("Prev Button")
+                    .label("Previous")
+                    .style(ButtonStyle::Secondary);
+
+                if index == 1 {
+                    button.disabled(true);
+                }
+                button
+            })
+            .create_button(|button| {
+                button
+                    .custom_id("Next Button")
+                    .label("Next")
+                    .style(ButtonStyle::Secondary);
+
+                if index == last_page_index {
+                    button.disabled(true);
+                }
+                button
+            })
+        });
+
+        ("".to_string(), Some(embed), Some(components))
     } else {
-        ("This name doesn't exist".to_string(), None)
+        ("This name doesn't exist".to_string(), None, None)
         // check_msg(
         //     message
         //         .channel_id
