@@ -132,7 +132,7 @@ impl EventHandler for Handler {
             {
                 error!("Couldn't respond to slash command: {}", why);
             }
-        } else if let Interaction::MessageComponent(mut component) = interaction {
+        } else if let Interaction::MessageComponent(component) = interaction {
             debug!("Received message component interaction");
 
             let footer_text = component

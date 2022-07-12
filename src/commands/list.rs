@@ -144,41 +144,18 @@ pub async fn list(
             }
 
             let line_len = line_str.chars().count();
-            // TODO: create pages if embed too long
             if count - start_pos > ELEMENTS_PER_PAGE {
                 break;
             }
             count += 1;
-            // if msg_len + line_len > EMBED_DESCRIPTION_MAX_LENGTH {
-            //     break;
-            //     //     let msg_res = message.channel_id.send_message(&ctx, |m| {
-            //     //         m.embed(|e| {
-            //     //             e.title(format!("Announcements for \"{}\"", &name));
-            //     //             e.description(msg_str);
-            //     //             e.colour(Colour::from_rgb(128, 128, 128));
-
-            //     //             e
-            //     //         });
-
-            //     //         m
-            //     //     });
-            //     //     check_msg(msg_res.await);
-
-            //     //     msg_str = "".to_string();
-            //     //     msg_len = 0;
-            // }
+            if msg_len + line_len > EMBED_DESCRIPTION_MAX_LENGTH {
+                return ("Embed too long.".to_string(), None, None);
+            }
 
             msg_str.push_str("\n");
             msg_str.push_str(&line_str);
             msg_len += line_len + 1;
         }
-
-        // let msg_res = message.channel_id.send_message(&ctx, |m| {
-        //     m.embed();
-
-        //     m
-        // });
-        // check_msg(msg_res.await);
 
         let mut embed = CreateEmbed::default();
         embed
@@ -218,11 +195,5 @@ pub async fn list(
         ("".to_string(), Some(embed), Some(components))
     } else {
         ("This name doesn't exist".to_string(), None, None)
-        // check_msg(
-        //     message
-        //         .channel_id
-        //         .say(&ctx, "This name doesn't exist")
-        //         .await,
-        // );
     }
 }
