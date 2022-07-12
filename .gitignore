@@ -1,11 +1,10 @@
-package-lock.json
+.vscode
 Cargo.lock
 test_run.sh
 debug_test_run.sh
 test_run_container.sh
-
+test_functions.txt
+experimental_test_functions.txt
 
 /target
 **/*.rs.bk
-test_functions.txt
-experimental_test_functions.txt
