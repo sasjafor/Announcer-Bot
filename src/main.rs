@@ -33,7 +33,7 @@ use serenity::{
         id::{ChannelId, UserId},
         interactions::{
             application_command::{
-                ApplicationCommand, ApplicationCommandInteractionDataOptionValue,
+                ApplicationCommand, ApplicationCommandInteractionDataOptionValue, ApplicationCommandOptionType,
             },
             message_component::ComponentType,
         },
@@ -47,7 +47,7 @@ use tracing::{debug, error, info};
 
 use rusqlite::{params, Connection};
 
-use commands::{list::*, newfile::*, random::*, set::*};
+use commands::{list::*, new::*, random::*, set::*};
 
 use lib::check::can_connect;
 
@@ -109,6 +109,56 @@ impl EventHandler for Handler {
                     let index = index_arg.unwrap_or(1);
 
                     list(&ctx, &command.user, &name, index).await
+                }
+                "new" => {
+                    let command_option = command
+                        .data
+                        .options
+                        .get(0)
+                        .expect("Expected command option.");
+
+                    if command_option.kind != ApplicationCommandOptionType::SubCommand {
+                        error!("Expected sub command.");
+                    }
+
+                    let mut res = ("Command not implemented".to_string(), None, None);
+                    if command_option.name == "file" {
+                        let user_option = command_option.options.get(0).expect("Expected user.").resolved.as_ref().expect("Expected user obj.");
+
+                        if let ApplicationCommandInteractionDataOptionValue::User(user, member) = user_option {
+                            let announcement_option = command_option.options.get(1).expect("Expected announcement.").resolved.as_ref().expect("Expected announcement obj.");
+                            if let ApplicationCommandInteractionDataOptionValue::String(announcement) = announcement_option {
+                                let attachment_option = command_option.options.get(2).expect("Expected attachment.").resolved.as_ref().expect("Expected attachment obj.");
+                                if let ApplicationCommandInteractionDataOptionValue::Attachment(attachment) = attachment_option {
+                                    let filters = match command_option.options.get(3) {
+                                        Some(filters) => {
+                                            let filters_option = filters.resolved.as_ref().expect("Expected filters obj.");
+                                            if let ApplicationCommandInteractionDataOptionValue::String(filters) = filters_option {
+                                                Some(filters)
+                                            } else {
+                                                None
+                                            }
+                                        },
+                                        None => None
+                                    };
+                                    
+
+                                    let name = match member {
+                                        Some(member) => match &member.nick {
+                                            Some(nick) => nick.clone(),
+                                            None => user.name.clone()
+                                        },
+                                        None => user.name.clone()
+                                    };
+                                    res = new_file(&ctx, &name, announcement, attachment, user, filters).await;
+                                }
+                            }
+                        }
+                    } else if command_option.name == "url" {
+                        
+                    }
+
+                    res
                 }
                 _ => ("Command not implemented".to_string(), None, None),
             };
@@ -210,6 +260,19 @@ impl EventHandler for Handler {
 
         let guild_command =
             ApplicationCommand::create_global_application_command(&ctx.http, create_list_command)
+                .await;
+
+        if let Ok(gc) = guild_command {
+            debug!("Created global slash command: {:#?}", gc.name);
+        } else {
+            error!(
+                "Failed to create global slash command: {:?}",
+                guild_command.err()
+            );
+        }
+
+        let guild_command =
+            ApplicationCommand::create_global_application_command(&ctx.http, create_new_command)
                 .await;
 
         if let Ok(gc) = guild_command {
@@ -349,7 +412,7 @@ impl EventHandler for Handler {
 }
 
 #[group]
-#[commands(newfile, set, random)]
+#[commands(set, random)]
 #[only_in("guilds")]
 #[help_available]
 struct General;
