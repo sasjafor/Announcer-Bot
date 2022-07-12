@@ -13,7 +13,6 @@ use serenity::{
 };
 
 use tracing::error;
-
 use rusqlite::{params, Connection, OptionalExtension};
 
 const EMBED_DESCRIPTION_MAX_LENGTH: usize = 4096;
