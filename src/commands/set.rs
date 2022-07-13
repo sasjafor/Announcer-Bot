@@ -1,4 +1,4 @@
-use std::{path::Path};
+use std::path::Path;
 
 use serenity::{
     builder::{CreateApplicationCommand, CreateComponents, CreateEmbed},
@@ -7,8 +7,8 @@ use serenity::{
     utils::Colour,
 };
 
-use tracing::{debug, error};
 use rusqlite::{params, Connection};
+use tracing::{debug, error};
 
 pub fn create_set_command(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
     return command
