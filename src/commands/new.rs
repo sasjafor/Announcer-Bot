@@ -6,8 +6,8 @@ use serenity::{
     model::{interactions::application_command::ApplicationCommandOptionType, prelude::*},
 };
 
-use tracing::{debug, error};
 use rusqlite::{params, Connection};
+use tracing::{debug, error};
 use url::Url;
 
 use crate::lib::parse::parse_duration;
@@ -218,12 +218,10 @@ pub async fn new_url(
         .arg(end)
         .arg("-i")
         .arg(audio_url)
-        .arg("-c")
-        .arg("copy")
         .arg("-vn")
         .arg("-f")
         .arg("wav")
-        .arg(format!("{}{}", "file:", &filename))
+        .arg(format!("file:{}", &filename))
         .current_dir(&processing_path)
         .output()
         .expect("failed to run ffmpeg")
@@ -244,7 +242,7 @@ pub async fn new_url(
 }
 
 pub async fn new(
-    ctx: &Context,
+    _ctx: &Context,
     name: &String,
     announcement_name: &String,
     user: &User,
@@ -258,7 +256,7 @@ pub async fn new(
 
     let normalize_and_filter_string;
     if filters.is_some() {
-        normalize_and_filter_string = format!("{},loudnorm", &filters.unwrap());
+        normalize_and_filter_string = format!("{},loudnorm", filters.unwrap());
     } else {
         normalize_and_filter_string = "loudnorm".to_string();
     }
@@ -271,6 +269,8 @@ pub async fn new(
         .arg(format!("file:{}", &filename))
         .arg("-filter:a")
         .arg(&normalize_and_filter_string)
+        .arg("-ar")
+        .arg("48000")
         .arg("-f")
         .arg("wav")
         .arg(format!("file:{}", &processed_filename))
@@ -278,8 +278,10 @@ pub async fn new(
         .output()
         .expect("Failed to run ffmpeg");
 
+    debug!("ffmpeg -y -t 00:00:06 -i {} -filter:a {} -ar 48000 -f wav {}", format!("file:{}", &filename), &normalize_and_filter_string, format!("file:{}", &processed_filename));
+
     if !filter_output.status.success() {
-        let _ = delete_processing_files(&processing_path, &filename, &processed_filename);
+        // let _ = delete_processing_files(&processing_path, &filename, &processed_filename);
 
         let err_str = "Failed to apply audio filter".to_string();
         error!(
@@ -358,10 +360,7 @@ fn delete_processing_files(processing_path: &str, filename: &str, processed_file
     let _ = match fs::remove_file(format!("{}{}", &processing_path, &processed_filename)) {
         Ok(res) => res,
         Err(why) => {
-            debug!(
-                "Failed to remove queue file {} ERROR: {}",
-                &processed_filename, why
-            );
+            debug!("Failed to remove queue file {} ERROR: {}", &processed_filename, why);
         }
     };
 }

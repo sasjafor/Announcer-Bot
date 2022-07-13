@@ -27,6 +27,7 @@ use serenity::{
         StandardFramework,
     },
     http::Http,
+    json::Value,
     model::{
         event::ResumedEvent,
         gateway::Ready,
@@ -67,6 +68,10 @@ impl EventHandler for Handler {
         if let Interaction::ApplicationCommand(command) = interaction {
             debug!("Received slash command: {:#?}", command.data.name);
 
+            if let Err(why) = command.defer(&ctx.http).await {
+                error!("Couldn't respond to slash command: {}", why);
+            }
+
             let (content, embed, components) = match command.data.name.as_str() {
                 "list" => {
                     let options = &command.data.options;
@@ -77,18 +82,12 @@ impl EventHandler for Handler {
                         let arg_val = arg.resolved.as_ref().expect("Expected object").to_owned();
                         match arg.name.as_str() {
                             "name" => {
-                                if let ApplicationCommandInteractionDataOptionValue::String(
-                                    string_val,
-                                ) = arg_val
-                                {
+                                if let ApplicationCommandInteractionDataOptionValue::String(string_val) = arg_val {
                                     name_arg = Some(string_val);
                                 }
                             }
                             "index" => {
-                                if let ApplicationCommandInteractionDataOptionValue::Integer(
-                                    int_val,
-                                ) = arg_val
-                                {
+                                if let ApplicationCommandInteractionDataOptionValue::Integer(int_val) = arg_val {
                                     index_arg = Some(int_val as usize);
                                 }
                             }
@@ -111,51 +110,121 @@ impl EventHandler for Handler {
                     list(&ctx, &command.user, &name, index).await
                 }
                 "new" => {
-                    let command_option = command
-                        .data
-                        .options
-                        .get(0)
-                        .expect("Expected command option.");
+                    let command_option = command.data.options.get(0).expect("Expected command option.");
 
                     if command_option.kind != ApplicationCommandOptionType::SubCommand {
                         error!("Expected sub command.");
                     }
 
                     let mut res = ("Command not implemented".to_string(), None, None);
-                    if command_option.name == "file" {
-                        let user_option = command_option.options.get(0).expect("Expected user.").resolved.as_ref().expect("Expected user obj.");
 
-                        if let ApplicationCommandInteractionDataOptionValue::User(user, member) = user_option {
-                            let announcement_option = command_option.options.get(1).expect("Expected announcement.").resolved.as_ref().expect("Expected announcement obj.");
-                            if let ApplicationCommandInteractionDataOptionValue::String(announcement) = announcement_option {
-                                let attachment_option = command_option.options.get(2).expect("Expected attachment.").resolved.as_ref().expect("Expected attachment obj.");
-                                if let ApplicationCommandInteractionDataOptionValue::Attachment(attachment) = attachment_option {
+                    let user_option = command_option
+                        .options
+                        .get(0)
+                        .expect("Expected user.")
+                        .resolved
+                        .as_ref()
+                        .expect("Expected user obj.");
+                    if let ApplicationCommandInteractionDataOptionValue::User(user, member) = user_option {
+                        let announcement_option = command_option
+                            .options
+                            .get(1)
+                            .expect("Expected announcement.")
+                            .resolved
+                            .as_ref()
+                            .expect("Expected announcement obj.");
+                        if let ApplicationCommandInteractionDataOptionValue::String(announcement) = announcement_option
+                        {
+                            if command_option.name == "file" {
+                                let attachment_option = command_option
+                                    .options
+                                    .get(2)
+                                    .expect("Expected attachment.")
+                                    .resolved
+                                    .as_ref()
+                                    .expect("Expected attachment obj.");
+                                if let ApplicationCommandInteractionDataOptionValue::Attachment(attachment) =
+                                    attachment_option
+                                {
                                     let filters = match command_option.options.get(3) {
                                         Some(filters) => {
-                                            let filters_option = filters.resolved.as_ref().expect("Expected filters obj.");
-                                            if let ApplicationCommandInteractionDataOptionValue::String(filters) = filters_option {
+                                            let filters_option =
+                                                filters.resolved.as_ref().expect("Expected filters obj.");
+                                            if let ApplicationCommandInteractionDataOptionValue::String(filters) =
+                                                filters_option
+                                            {
                                                 Some(filters)
                                             } else {
                                                 None
                                             }
-                                        },
-                                        None => None
+                                        }
+                                        None => None,
                                     };
-                                    
 
                                     let name = match member {
                                         Some(member) => match &member.nick {
                                             Some(nick) => nick.clone(),
-                                            None => user.name.clone()
+                                            None => user.name.clone(),
                                         },
-                                        None => user.name.clone()
+                                        None => user.name.clone(),
                                     };
                                     res = new_file(&ctx, &name, announcement, attachment, user, filters).await;
                                 }
+                            } else if command_option.name == "url" {
+                                let url_option = command_option
+                                    .options
+                                    .get(2)
+                                    .expect("Expected url.")
+                                    .resolved
+                                    .as_ref()
+                                    .expect("Expected url obj.");
+                                if let ApplicationCommandInteractionDataOptionValue::String(url) = url_option {
+                                    let start_option = command_option
+                                        .options
+                                        .get(3)
+                                        .expect("Expected start.")
+                                        .resolved
+                                        .as_ref()
+                                        .expect("Expected start obj.");
+                                    if let ApplicationCommandInteractionDataOptionValue::String(start) = start_option {
+                                        let end_option = command_option
+                                            .options
+                                            .get(4)
+                                            .expect("Expected start.")
+                                            .resolved
+                                            .as_ref()
+                                            .expect("Expected start obj.");
+                                        if let ApplicationCommandInteractionDataOptionValue::String(end) = end_option {
+                                            let filters = match command_option.options.get(5) {
+                                                Some(filters) => {
+                                                    let filters_option =
+                                                        filters.resolved.as_ref().expect("Expected filters obj.");
+                                                    if let ApplicationCommandInteractionDataOptionValue::String(
+                                                        filters,
+                                                    ) = filters_option
+                                                    {
+                                                        Some(filters)
+                                                    } else {
+                                                        None
+                                                    }
+                                                }
+                                                None => None,
+                                            };
+
+                                            let name = match member {
+                                                Some(member) => match &member.nick {
+                                                    Some(nick) => nick.clone(),
+                                                    None => user.name.clone(),
+                                                },
+                                                None => user.name.clone(),
+                                            };
+                                            res = new_url(&ctx, &name, announcement, url, start, end, user, filters)
+                                                .await;
+                                        }
+                                    }
+                                }
                             }
                         }
-                    } else if command_option.name == "url" {
-                        
                     }
 
                     res
@@ -164,19 +233,15 @@ impl EventHandler for Handler {
             };
 
             if let Err(why) = command
-                .create_interaction_response(&ctx.http, |response| {
-                    response
-                        .kind(InteractionResponseType::ChannelMessageWithSource)
-                        .interaction_response_data(|message| {
-                            message.content(content);
-                            if let Some(e) = embed {
-                                message.add_embed(e);
-                            }
-                            if let Some(c) = components {
-                                message.set_components(c);
-                            }
-                            message
-                        })
+                .edit_original_interaction_response(&ctx.http, |message| {
+                    message.content(content);
+                    if let Some(e) = embed {
+                        message.add_embed(e);
+                    }
+                    if let Some(c) = components {
+                        message.0.insert("components", Value::from(c.0));
+                    }
+                    message
                 })
                 .await
             {
@@ -258,30 +323,20 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!("Connected as {}", ready.user.name);
 
-        let guild_command =
-            ApplicationCommand::create_global_application_command(&ctx.http, create_list_command)
-                .await;
+        let guild_command = ApplicationCommand::create_global_application_command(&ctx.http, create_list_command).await;
 
         if let Ok(gc) = guild_command {
             debug!("Created global slash command: {:#?}", gc.name);
         } else {
-            error!(
-                "Failed to create global slash command: {:?}",
-                guild_command.err()
-            );
+            error!("Failed to create global slash command: {:?}", guild_command.err());
         }
 
-        let guild_command =
-            ApplicationCommand::create_global_application_command(&ctx.http, create_new_command)
-                .await;
+        let guild_command = ApplicationCommand::create_global_application_command(&ctx.http, create_new_command).await;
 
         if let Ok(gc) = guild_command {
             debug!("Created global slash command: {:#?}", gc.name);
         } else {
-            error!(
-                "Failed to create global slash command: {:?}",
-                guild_command.err()
-            );
+            error!("Failed to create global slash command: {:?}", guild_command.err());
         }
     }
 
@@ -289,12 +344,7 @@ impl EventHandler for Handler {
         info!("Resumed");
     }
 
-    async fn voice_state_update(
-        &self,
-        ctx: Context,
-        old_state: Option<VoiceState>,
-        new_state: VoiceState,
-    ) {
+    async fn voice_state_update(&self, ctx: Context, old_state: Option<VoiceState>, new_state: VoiceState) {
         const USER1_ID: UserId = UserId(239705630913331201); // demain
         const USER2_ID: UserId = UserId(180995420196044809); // seschu
 
@@ -347,17 +397,8 @@ impl EventHandler for Handler {
                     let self_channel_id = handler.current_channel();
 
                     if self_channel_id.is_some() {
-                        if voice_channel_is_empty(
-                            &ctx,
-                            &guild,
-                            ChannelId(self_channel_id.unwrap().0),
-                        )
-                        .await
-                        {
-                            let _ = handler
-                                .leave()
-                                .await
-                                .expect("Failed to leave voice channel");
+                        if voice_channel_is_empty(&ctx, &guild, ChannelId(self_channel_id.unwrap().0)).await {
+                            let _ = handler.leave().await.expect("Failed to leave voice channel");
                             info!("Left empty voice channel");
                             return;
                         }
@@ -466,20 +507,17 @@ async fn main() {
         .group(&GENERAL_GROUP)
         .help(&MY_HELP)
         .configure(|c| {
-            c.prefix("!")
-                .allow_dm(false)
-                .case_insensitivity(true)
-                .allowed_channels(
-                    vec![
-                        ChannelId(552168558323564544), // announcer-bot-submissions (Test server)
-                        ChannelId(511144158975623169), // announcer-bot-submissions (Cupboard under the stairs)
-                        ChannelId(780475875698409502), // test channel
-                        ChannelId(739933045406171166), // gay-announcement (Rütlischwur Dudes)
-                        ChannelId(955573958403571822), // announcer-bot-submissions (Spielbande)
-                    ]
-                    .into_iter()
-                    .collect(),
-                )
+            c.prefix("!").allow_dm(false).case_insensitivity(true).allowed_channels(
+                vec![
+                    ChannelId(552168558323564544), // announcer-bot-submissions (Test server)
+                    ChannelId(511144158975623169), // announcer-bot-submissions (Cupboard under the stairs)
+                    ChannelId(780475875698409502), // test channel
+                    ChannelId(739933045406171166), // gay-announcement (Rütlischwur Dudes)
+                    ChannelId(955573958403571822), // announcer-bot-submissions (Spielbande)
+                ]
+                .into_iter()
+                .collect(),
+            )
         });
 
     let intents = GatewayIntents::GUILD_MEMBERS
