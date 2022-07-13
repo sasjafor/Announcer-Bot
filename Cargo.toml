@@ -22,6 +22,7 @@ rand = "0.8.5"
 tracing = "0.1.32"
 tracing-subscriber = "0.3.9"
 tracing-futures = "0.2.5" # needed so instrument works with async functions.
+poise = "0.2.2"
 
 [dependencies.songbird]
 git = "https://github.com/serenity-rs/songbird"
@@ -40,11 +41,9 @@ default-features = false
 features = [
     "builder",
     "client",
-    "framework",
     "gateway",
     "http",
     "model",
-    "standard_framework",
     "utils",
     "cache",
     "voice",
