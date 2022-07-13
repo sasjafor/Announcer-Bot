@@ -1,100 +1,77 @@
-use std::{
-    path::Path, 
-};
+use std::{path::Path};
 
 use serenity::{
-    client::{
-        Context,
-    },
-    framework::{
-        standard::{
-            macros::{
-                command,
-            }, 
-            Args,
-            CommandResult,
-        },
-    },
-    model::{
-        prelude::*,
-    },
+    builder::{CreateApplicationCommand, CreateComponents, CreateEmbed},
+    client::Context,
+    model::{interactions::application_command::ApplicationCommandOptionType, prelude::*},
     utils::Colour,
 };
 
-use tracing::{error};
+use tracing::{debug, error};
+use rusqlite::{params, Connection};
 
-use rusqlite::{
-    Connection,
-    params,
-};
+pub fn create_set_command(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
+    return command
+        .name("set")
+        .description("Set the active announcement for the current nickname.")
+        .create_option(|option| {
+            option
+                .name("name")
+                .description("The name for which to list announcements.")
+                .kind(ApplicationCommandOptionType::String)
+        })
+        .create_option(|option| {
+            option
+                .name("index")
+                .description("The user for which to set the active announcement.")
+                .kind(ApplicationCommandOptionType::User)
+        });
+}
 
-use crate::lib::msg::check_msg;
-
-#[command]
-#[aliases("setactive", "set_active")]
-#[description("Set the active announcement for the current nickname")]
-#[usage("<announcement name>")]
-#[example("funny")]
-#[example("\"funny noise\"")]
-#[num_args(1)]
-#[help_available]
-pub async fn set(ctx: &Context, message: &Message, args: Args) -> CommandResult {
-    let arguments = args.raw_quoted().collect::<Vec<&str>>();
-
-    let option_nick = &message.author_nick(&ctx).await;
-    let name = match option_nick {
-        Some(nick) => nick,
-        None => &message.author.name
-    };
-
-    if arguments.len() < 1 {
-        check_msg(message.channel_id.say(&ctx, "Please provide the name for the file you want to set active").await);
-        return Ok(());
-    }
-
-    let filename = arguments[0];
-
-    let path_string = format!("/config/index/{}/{}.wav", &name, &filename);
+pub async fn set(
+    _ctx: &Context,
+    name: &String,
+    announcement_name: &String,
+    user: User,
+) -> (String, Option<CreateEmbed>, Option<CreateComponents>) {
+    let path_string = format!("/config/index/{}/{}.wav", &name, &announcement_name);
     let path = Path::new(&path_string);
 
     if !path.exists() {
-        check_msg(message.channel_id.say(&ctx, "Please choose a valid filename").await);
-        return Ok(());
+        let err_str = "Please choose a valid announcement".to_string();
+        debug!("{}: {}", err_str, "File doesn't exist.");
+        return (err_str, None, None);
     }
 
     let db_path = Path::new("/config/database/db.sqlite");
 
     let db = match Connection::open(&db_path) {
         Ok(db) => db,
-        Err(err) => {
-            error!("Failed to open database: {}", err);
-            return Ok(());
+        Err(why) => {
+            let err_str = "Failed to open database".to_string();
+            error!("{}: {}", err_str, why);
+            return (err_str, None, None);
         }
     };
 
-    let user_id = message.author.id.as_u64();
+    let user_id = user.id.as_u64();
     let _ = match db.execute(
         "INSERT OR REPLACE INTO names (name, user_id, active_file)
             VALUES (?1, ?2, ?3)",
-        params![&name, *user_id as i64, &filename]) {
-            Ok(_) => (),
-            Err(err) => {
-                error!("Failed to insert new name, Error Code {}", err);
-                return Ok(());
-            }
+        params![&name, *user_id as i64, &announcement_name],
+    ) {
+        Ok(_) => (),
+        Err(why) => {
+            let err_str = "Failed to insert new name".to_string();
+            error!("{}: {}", err_str, why);
+            return (err_str, None, None);
+        }
     };
 
-    let msg_res = message.channel_id.send_message(&ctx, |m| {
-        m.embed(|e| {
-            e.title(format!("Set announcement"));
-            e.description(format!("`{}` [{}]", &filename, &message.author.mention()));
-            e.colour(Colour::from_rgb(128,128,128));
+    let mut embed = CreateEmbed::default();
+    embed.title(format!("Set announcement"));
+    embed.description(format!("`{}` [{}]", &announcement_name, &user.mention()));
+    embed.colour(Colour::from_rgb(128, 128, 128));
 
-            e
-        });
-
-        m
-    });
-    check_msg(msg_res.await);
-    return Ok(());
+    return ("".to_string(), Some(embed), None);
 }

@@ -323,6 +323,7 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!("Connected as {}", ready.user.name);
 
+        // create global slash commands
         let guild_command = ApplicationCommand::create_global_application_command(&ctx.http, create_list_command).await;
 
         if let Ok(gc) = guild_command {
@@ -332,6 +333,14 @@ impl EventHandler for Handler {
         }
 
         let guild_command = ApplicationCommand::create_global_application_command(&ctx.http, create_new_command).await;
+
+        if let Ok(gc) = guild_command {
+            debug!("Created global slash command: {:#?}", gc.name);
+        } else {
+            error!("Failed to create global slash command: {:?}", guild_command.err());
+        }
+
+        let guild_command = ApplicationCommand::create_global_application_command(&ctx.http, create_set_command).await;
 
         if let Ok(gc) = guild_command {
             debug!("Created global slash command: {:#?}", gc.name);
@@ -453,7 +462,7 @@ impl EventHandler for Handler {
 }
 
 #[group]
-#[commands(set, random)]
+#[commands(random)]
 #[only_in("guilds")]
 #[help_available]
 struct General;
