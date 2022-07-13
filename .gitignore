@@ -1,5 +1,4 @@
 .vscode
-Cargo.lock
 test_run.sh
 debug_test_run.sh
 test_run_container.sh
