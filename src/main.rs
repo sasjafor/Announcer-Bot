@@ -2,7 +2,7 @@ mod commands;
 mod lib;
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     env,
     fs::{self},
     path::Path,
@@ -17,21 +17,12 @@ use songbird::SerenityInit;
 use serenity::{
     async_trait,
     client::{bridge::gateway::ShardManager, Context, EventHandler},
-    // framework::standard::{
-    //     help_commands,
-    //     macros::{group, help},
-    //     Args, CommandGroup, CommandResult, HelpOptions,
-    // },
-    json::Value,
     model::{
         event::ResumedEvent,
         gateway::Ready,
         id::{ChannelId, UserId},
-        interactions::{
-            application_command::{
-                ApplicationCommand, ApplicationCommandInteractionDataOptionValue, ApplicationCommandOptionType,
-            },
-            message_component::ComponentType,
+        interactions::application_command::{
+            ApplicationCommand, ApplicationCommandInteractionDataOptionValue, ApplicationCommandOptionType,
         },
         prelude::*,
         voice::VoiceState,
@@ -39,7 +30,6 @@ use serenity::{
     prelude::{Mutex, TypeMapKey},
 };
 
-use regex::Regex;
 use rusqlite::{params, Connection};
 use tracing::{debug, error, info, warn};
 
@@ -54,9 +44,7 @@ type Error = Box<dyn std::error::Error + Send + Sync>;
 type pContext<'a> = poise::Context<'a, Data, Error>;
 
 // Custom user data passed to all command functions
-pub struct Data {
-    votes: Mutex<HashMap<String, u32>>,
-}
+pub struct Data {}
 
 struct ShardManagerContainer;
 
@@ -70,17 +58,7 @@ struct Handler;
 impl EventHandler for Handler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
-            debug!("Received slash command: {:#?}", command.data.name);
-
-            if let Err(why) = command.defer(&ctx.http).await {
-                error!("Couldn't respond to slash command: {}", why);
-            }
-
             let (content, embed, components) = match command.data.name.as_str() {
-                // "list" => {
-
-                //     list(&ctx, &command.user, &name, index).await
-                // }
                 "new" => {
                     let command_option = command.data.options.get(0).expect("Expected command option.");
 
@@ -203,22 +181,6 @@ impl EventHandler for Handler {
                 }
                 _ => ("".to_string(), None, None),
             };
-
-            // if let Err(why) = command
-            //     .edit_original_interaction_response(&ctx.http, |message| {
-            //         message.content(content);
-            //         if let Some(e) = embed {
-            //             message.add_embed(e);
-            //         }
-            //         if let Some(c) = components {
-            //             message.0.insert("components", Value::from(c.0));
-            //         }
-            //         message
-            //     })
-            //     .await
-            // {
-            //     error!("Couldn't respond to slash command: {}", why);
-            // }
         } else if let Interaction::MessageComponent(component) = interaction {
             // debug!("Received message component interaction");
 
@@ -294,31 +256,6 @@ impl EventHandler for Handler {
 
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!("Connected as {}", ready.user.name);
-
-        // create global slash commands
-        // let guild_command = ApplicationCommand::create_global_application_command(&ctx.http, create_list_command).await;
-
-        // if let Ok(gc) = guild_command {
-        //     debug!("Created global slash command: {:#?}", gc.name);
-        // } else {
-        //     error!("Failed to create global slash command: {:?}", guild_command.err());
-        // }
-
-        let guild_command = ApplicationCommand::create_global_application_command(&ctx.http, create_new_command).await;
-
-        if let Ok(gc) = guild_command {
-            debug!("Created global slash command: {:#?}", gc.name);
-        } else {
-            error!("Failed to create global slash command: {:?}", guild_command.err());
-        }
-
-        // let guild_command = ApplicationCommand::create_global_application_command(&ctx.http, create_set_command).await;
-
-        // if let Ok(gc) = guild_command {
-        //     debug!("Created global slash command: {:#?}", gc.name);
-        // } else {
-        //     error!("Failed to create global slash command: {:?}", guild_command.err());
-        // }
     }
 
     async fn resume(&self, _: Context, _: ResumedEvent) {
@@ -433,28 +370,6 @@ impl EventHandler for Handler {
     }
 }
 
-// #[group]
-// #[commands(random)]
-// #[only_in("guilds")]
-// #[help_available]
-// struct General;
-
-// #[help]
-// #[no_help_available_text("No help available for this command")]
-// #[command_not_found_text = "Could not find: `{}`."]
-// #[max_levenshtein_distance(3)]
-// async fn my_help(
-//     context: &Context,
-//     msg: &Message,
-//     args: Args,
-//     help_options: &'static HelpOptions,
-//     groups: &[&'static CommandGroup],
-//     owners: HashSet<UserId>,
-// ) -> CommandResult {
-//     let _ = help_commands::plain(context, msg, args, help_options, groups, owners).await;
-//     Ok(())
-// }
-
 /// Show this help menu
 #[poise::command(prefix_command, track_edits, slash_command)]
 async fn help(
@@ -467,7 +382,11 @@ async fn help(
         ctx,
         command.as_deref(),
         poise::builtins::HelpConfiguration {
-            extra_text_at_bottom: format!("If you have questions just ask {}", UserId(180995420196044809).mention()).as_str(),
+            extra_text_at_bottom: format!(
+                "If you have questions just ask {}",
+                UserId(180995420196044809).mention()
+            )
+            .as_str(),
             show_context_menu_commands: true,
             ..Default::default()
         },
@@ -516,19 +435,6 @@ async fn main() {
     // Login with a bot token from the environment
     let token = env::var("DISCORD_APP_AUTH_TOKEN").expect("Expected a token in the environment");
 
-    // let http = Http::new(&token);
-
-    // // We will fetch your bot's owners and id
-    // let (_owners, _bot_id) = match http.get_current_application_info().await {
-    //     Ok(info) => {
-    //         let mut owners = HashSet::new();
-    //         owners.insert(info.owner.id);
-
-    //         (owners, info.id)
-    //     }
-    //     Err(why) => panic!("Could not access application info: {:?}", why),
-    // };
-
     let intents = GatewayIntents::GUILD_MEMBERS
         | GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::GUILD_VOICE_STATES
@@ -550,90 +456,38 @@ async fn main() {
                 ..Default::default()
             },
             on_error: |error| Box::pin(on_error(error)),
+            command_check: Some(|ctx| {
+                Box::pin(async move {
+                    if [
+                        552168558323564544, // announcer-bot-submissions (Test server)
+                        511144158975623169, // announcer-bot-submissions (Cupboard under the stairs)
+                        780475875698409502, // test channel
+                        739933045406171166, // gay-announcement (Rütlischwur Dudes)
+                        955573958403571822, // announcer-bot-submissions (Spielbande)
+                    ]
+                    .contains(&ctx.channel_id().0)
+                    {
+                        return Ok(true);
+                    } else {
+                        return Ok(false);
+                    }
+                })
+            }),
             pre_command: |ctx| {
                 Box::pin(async move {
                     debug!("Executing command {}", ctx.command().qualified_name);
+
+                    if let Err(why) = ctx.defer_or_broadcast().await {
+                        error!("Couldn't respond to command: {}", why);
+                    }
                 })
             },
             ..Default::default()
         })
         .token(token)
         .intents(intents)
-        .user_data_setup(move |_ctx, _ready, _framework| {
-            Box::pin(async move {
-                Ok(Data {
-                    votes: Mutex::new(HashMap::new()),
-                })
-            })
-        })
+        .user_data_setup(move |_ctx, _ready, _framework| Box::pin(async move { Ok(Data {}) }))
         .client_settings(move |f| f.register_songbird().event_handler(Handler));
-
-    // Create the framework
-    // let framework = StandardFramework::new()
-    //     .group(&GENERAL_GROUP)
-    //     .help(&MY_HELP)
-    //     .configure(|c| {
-    //         c.prefix("!").allow_dm(false).case_insensitivity(true).allowed_channels(
-    //             vec![
-    //                 ChannelId(552168558323564544), // announcer-bot-submissions (Test server)
-    //                 ChannelId(511144158975623169), // announcer-bot-submissions (Cupboard under the stairs)
-    //                 ChannelId(780475875698409502), // test channel
-    //                 ChannelId(739933045406171166), // gay-announcement (Rütlischwur Dudes)
-    //                 ChannelId(955573958403571822), // announcer-bot-submissions (Spielbande)
-    //             ]
-    //             .into_iter()
-    //             .collect(),
-    //         )
-    //     });
-
-    // let mut client = Client::builder(&token, intents)
-    //     .framework(framework)
-    //     .event_handler(Handler)
-    //     .register_songbird()
-    //     .await
-    //     .expect("Err creating client");
-
-    // {
-    //     let mut data = client.data.write().await;
-    //     data.insert::<ShardManagerContainer>(client.shard_manager.clone());
-    // }
-
-    // let shard_manager = client.shard_manager.clone();
-
-    // let framework_copy = framework.clone();
-    // tokio::spawn(async move {
-    //     #[cfg(unix)]
-    //     {
-    //         use tokio::signal::unix as signal;
-
-    //         let [mut s1, mut s2, mut s3] = [
-    //             signal::signal(signal::SignalKind::hangup()).unwrap(),
-    //             signal::signal(signal::SignalKind::interrupt()).unwrap(),
-    //             signal::signal(signal::SignalKind::terminate()).unwrap(),
-    //         ];
-
-    //         tokio::select!(
-    //             v = s1.recv() => v.unwrap(),
-    //             v = s2.recv() => v.unwrap(),
-    //             v = s3.recv() => v.unwrap(),
-    //         );
-    //     }
-    //     #[cfg(windows)]
-    //     {
-    //         let (mut s1, mut s2) = (
-    //             tokio::signal::windows::ctrl_c().unwrap(),
-    //             tokio::signal::windows::ctrl_break().unwrap(),
-    //         );
-
-    //         tokio::select!(
-    //             v = s1.recv() => v.unwrap(),
-    //             v = s2.recv() => v.unwrap(),
-    //         );
-    //     }
-
-    //     warn!("Received control C and shutting down.");
-    //     framework_copy.shard_manager().lock().await.shutdown_all().await;
-    // });
 
     let audio = Path::new("/config/audio");
     let index = Path::new("/config/index");
@@ -688,14 +542,6 @@ async fn main() {
         }
     };
 
-    // start listening for events by starting a single shard
-    // if let Err(why) = client.start().await {
-    //     error!("Client error: {:?}", why);
-    // }
-    // framework.start_autosharded().await.map_err(Into::into);
-    // framework.start_autosharded().await.unwrap();
-
-    framework.run()
-    .await
-    .unwrap();
+    // currently this is just running without shards, which I think is fine
+    framework.run().await.unwrap();
 }
