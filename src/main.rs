@@ -204,21 +204,21 @@ impl EventHandler for Handler {
                 _ => ("".to_string(), None, None),
             };
 
-            if let Err(why) = command
-                .edit_original_interaction_response(&ctx.http, |message| {
-                    message.content(content);
-                    if let Some(e) = embed {
-                        message.add_embed(e);
-                    }
-                    if let Some(c) = components {
-                        message.0.insert("components", Value::from(c.0));
-                    }
-                    message
-                })
-                .await
-            {
-                error!("Couldn't respond to slash command: {}", why);
-            }
+            // if let Err(why) = command
+            //     .edit_original_interaction_response(&ctx.http, |message| {
+            //         message.content(content);
+            //         if let Some(e) = embed {
+            //             message.add_embed(e);
+            //         }
+            //         if let Some(c) = components {
+            //             message.0.insert("components", Value::from(c.0));
+            //         }
+            //         message
+            //     })
+            //     .await
+            // {
+            //     error!("Couldn't respond to slash command: {}", why);
+            // }
         } else if let Interaction::MessageComponent(component) = interaction {
             // debug!("Received message component interaction");
 
@@ -312,13 +312,13 @@ impl EventHandler for Handler {
             error!("Failed to create global slash command: {:?}", guild_command.err());
         }
 
-        let guild_command = ApplicationCommand::create_global_application_command(&ctx.http, create_set_command).await;
+        // let guild_command = ApplicationCommand::create_global_application_command(&ctx.http, create_set_command).await;
 
-        if let Ok(gc) = guild_command {
-            debug!("Created global slash command: {:#?}", gc.name);
-        } else {
-            error!("Failed to create global slash command: {:?}", guild_command.err());
-        }
+        // if let Ok(gc) = guild_command {
+        //     debug!("Created global slash command: {:#?}", gc.name);
+        // } else {
+        //     error!("Failed to create global slash command: {:?}", guild_command.err());
+        // }
     }
 
     async fn resume(&self, _: Context, _: ResumedEvent) {
@@ -539,7 +539,7 @@ async fn main() {
             commands: vec![
                 help(),
                 register(),
-                // set(),
+                set(),
                 list(),
                 // new()
             ],
