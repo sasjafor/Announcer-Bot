@@ -78,7 +78,7 @@ pub async fn set(
         let mut collector = message.await_component_interactions(ctx.discord()).build();
         while let Some(interaction) = collector.next().await {
             match interaction.data.custom_id.as_str() {
-                announcement_selector_dropdown => {
+                ANNOUNCEMENT_SELECTOR_DROPDOWN => {
                     let announcement_name = interaction.data.values.first().unwrap().to_owned();
                     return match set_fn(ctx, &announcement_name, &discord_user, &discord_name).await {
                         Ok(_) => interaction
@@ -105,7 +105,7 @@ pub async fn set(
                         Err(why) => Err(why),
                     };
                 },
-                announcement_selector_prev_button => {
+                ANNOUNCEMENT_SELECTOR_PREV_BUTTON => {
                     index -= 1;
                     let (options, over_limit) = match create_dropdown_options(ctx, &discord_name, index).await {
                         Ok(options) => options,
@@ -126,7 +126,7 @@ pub async fn set(
                                 return Err(Into::into(why));
                             }
                 },
-                announcement_selector_next_button => {
+                ANNOUNCEMENT_SELECTOR_NEXT_BUTTON => {
                     index += 1;
                     let (options, over_limit) = match create_dropdown_options(ctx, &discord_name, index).await {
                         Ok(options) => options,
@@ -279,7 +279,7 @@ fn create_dropdown(components: &mut CreateComponents, prev: bool, next: bool, op
     components
         .create_action_row(|r| {
             r.create_select_menu(|s| {
-                s.custom_id(announcement_selector_dropdown)
+                s.custom_id(ANNOUNCEMENT_SELECTOR_DROPDOWN)
                     .min_values(1)
                     .max_values(1)
                     .options(|c| c.set_options(options))
@@ -287,7 +287,7 @@ fn create_dropdown(components: &mut CreateComponents, prev: bool, next: bool, op
         })
         .create_action_row(|r| {
             r.create_button(|b| {
-                b.custom_id(announcement_selector_prev_button)
+                b.custom_id(ANNOUNCEMENT_SELECTOR_PREV_BUTTON)
                     .label("Prev");
                 if !prev {
                     b.disabled(true);
@@ -295,7 +295,7 @@ fn create_dropdown(components: &mut CreateComponents, prev: bool, next: bool, op
                 b
             })
             .create_button(|b| {
-                b.custom_id(announcement_selector_next_button)
+                b.custom_id(ANNOUNCEMENT_SELECTOR_NEXT_BUTTON)
                     .label("Next");
                 if !next {
                     b.disabled(true);

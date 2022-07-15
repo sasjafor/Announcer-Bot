@@ -2,7 +2,6 @@ mod commands;
 mod lib;
 
 use std::{
-    collections::HashMap,
     env,
     fs::{self},
     path::Path,
@@ -22,7 +21,7 @@ use serenity::{
         gateway::Ready,
         id::{ChannelId, UserId},
         interactions::application_command::{
-            ApplicationCommand, ApplicationCommandInteractionDataOptionValue, ApplicationCommandOptionType,
+            ApplicationCommandInteractionDataOptionValue, ApplicationCommandOptionType,
         },
         prelude::*,
         voice::VoiceState,
