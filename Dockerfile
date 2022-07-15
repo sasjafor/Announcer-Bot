@@ -8,6 +8,10 @@ WORKDIR /announcer_bot
 # Copy manifest
 COPY ./Cargo.toml ./Cargo.toml
 
+# Install cmake
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends cmake
+
 # Build dependencies
 RUN RUSTFLAGS='-C link-arg=-s' cargo build --release
 
@@ -22,7 +26,7 @@ RUN RUSTFLAGS='-C link-arg=-s' cargo build --release
 FROM debian:bookworm-slim
 
 # Set log level
-ENV RUST_LOG warn
+ENV RUST_LOG announcer_bot=info
 
 # Setup apt, install package dependencies and create /config
 RUN apt-get update && \
@@ -32,6 +36,7 @@ RUN apt-get update && \
                                                 lame \
                                                 libopus0 \
                                                 libsqlite3-dev \
+                                                libssl1.1 \
                                                 libssl-dev \
                                                 python-is-python3 \
                                                 vorbis-tools \
