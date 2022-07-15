@@ -134,10 +134,10 @@ pub async fn list(
             }
 
             let line_len = line_str.chars().count();
+            count += 1;
             if count - start_pos > ELEMENTS_PER_PAGE {
                 break;
             }
-            count += 1;
             if msg_len + line_len > EMBED_DESCRIPTION_MAX_LENGTH {
                 let err_str = "Embed too long".to_string();
                 debug!("{}: {}", err_str, msg_len + line_len);
