@@ -5,7 +5,7 @@ use crate::{
 
 use std::{fs, path::Path};
 
-use poise::serenity_prelude::CreateComponents;
+use poise::{serenity_prelude::CreateComponents, futures_util::StreamExt};
 use serenity::{builder::CreateSelectMenuOption, model::prelude::*, utils::Colour};
 
 use rusqlite::{params, Connection};
@@ -75,12 +75,12 @@ pub async fn set(
             .await
             .unwrap();
 
-        let interaction = message.await_component_interaction(ctx.discord()).await;
-        if let Some(interaction) = interaction {
+        let mut collector = message.await_component_interactions(ctx.discord()).build();
+        while let Some(interaction) = collector.next().await {
             match interaction.data.custom_id.as_str() {
                 announcement_selector_dropdown => {
                     let announcement_name = interaction.data.values.first().unwrap().to_owned();
-                    match set_fn(ctx, &announcement_name, &discord_user, &discord_name).await {
+                    return match set_fn(ctx, &announcement_name, &discord_user, &discord_name).await {
                         Ok(_) => interaction
                             .create_interaction_response(&ctx.discord().http, |response| {
                                 response
@@ -103,7 +103,7 @@ pub async fn set(
                             .map(drop)
                             .map_err(Into::into),
                         Err(why) => Err(why),
-                    }
+                    };
                 },
                 announcement_selector_prev_button => {
                     index -= 1;
@@ -111,7 +111,7 @@ pub async fn set(
                         Ok(options) => options,
                         Err(why) => return Err(why),
                     };
-                    interaction
+                    if let Err(why) = interaction
                             .create_interaction_response(&ctx.discord().http, |response| {
                                 response
                                     .kind(InteractionResponseType::UpdateMessage)
@@ -122,9 +122,9 @@ pub async fn set(
                                         })
                                     })
                             })
-                            .await
-                            .map(drop)
-                            .map_err(Into::into)
+                            .await {
+                                return Err(Into::into(why));
+                            }
                 },
                 announcement_selector_next_button => {
                     index += 1;
@@ -132,7 +132,7 @@ pub async fn set(
                         Ok(options) => options,
                         Err(why) => return Err(why),
                     };
-                    interaction
+                    if let Err(why) = interaction
                             .create_interaction_response(&ctx.discord().http, |response| {
                                 response
                                     .kind(InteractionResponseType::UpdateMessage)
@@ -143,9 +143,9 @@ pub async fn set(
                                         })
                                     })
                             })
-                            .await
-                            .map(drop)
-                            .map_err(Into::into)
+                            .await {
+                                return Err(Into::into(why));
+                            }
                 }
                 _ => {
                     let err_str = "Unknown component interaction".to_string();
@@ -153,11 +153,12 @@ pub async fn set(
                     return send_error(ctx, err_str).await;
                 }
             }
-        } else {
+        } 
+        // else {
             let err_str = "Failed to wait for component interaction".to_string();
             warn!("{}", err_str);
             return send_error(ctx, err_str).await;
-        }
+        // }
     }
 }
 
@@ -220,7 +221,7 @@ async fn create_dropdown_options(
                 let err_str = format!("Failed to read directory {}", path_string);
                 error!("{}: {}", err_str, err);
                 return match send_error(ctx, err_str).await {
-                    Ok(_) => Err(Box::new(serenity::Error::Other("Err"))),
+                    Ok(_) => Err(Into::into(serenity::Error::Other("Err"))),
                     Err(why) => Err(why),
                 };
             }
@@ -241,7 +242,7 @@ async fn create_dropdown_options(
                     let err_str = "Failed to get next entry".to_string();
                     error!("{}: {}", err_str, err);
                     return match send_error(ctx, err_str.clone()).await {
-                        Ok(_) => Err(Box::new(serenity::Error::Other("Err"))),
+                        Ok(_) => Err(Into::into(serenity::Error::Other("Err"))),
                         Err(why) => Err(why),
                     };
                 }
@@ -252,7 +253,7 @@ async fn create_dropdown_options(
                 let err_str = format!("Announcement name is too long {}", announcement_name);
                 warn!("{}: {}", err_str, announcement_name.len());
                 return match send_error(ctx, err_str.clone()).await {
-                    Ok(_) => Err(Box::new(serenity::Error::Other("Err"))),
+                    Ok(_) => Err(Into::into(serenity::Error::Other("Err"))),
                     Err(why) => Err(why),
                 };
             }
