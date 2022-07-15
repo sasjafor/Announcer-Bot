@@ -3,14 +3,15 @@ use crate::{
     pContext, Error,
 };
 
-use std::{fs, path::Path};
+use std::{fs, path::Path, time::Duration};
 
-use poise::{serenity_prelude::CreateComponents, futures_util::StreamExt};
+use poise::{futures_util::StreamExt, serenity_prelude::CreateComponents};
 use serenity::{builder::CreateSelectMenuOption, model::prelude::*, utils::Colour};
 
 use rusqlite::{params, Connection};
 use tracing::{debug, error, warn};
 
+const TIMEOUT_DURATION: Duration = Duration::from_secs(300);
 const ELEMENTS_PER_MENU: usize = 25;
 const ELEMENT_LABEL_LENGTH: usize = 100;
 
@@ -57,25 +58,23 @@ pub async fn set(
     } else {
         let mut index = 1;
         let (options, over_limit) = match create_dropdown_options(ctx, &discord_name, index).await {
-            Ok(options) => options,
+            Ok(res) => res,
             Err(why) => return Err(why),
         };
-
-        // let components = ;
 
         let message = ctx
             .send(|m| {
                 m.content("Choose an announcement").components(|c| {
                     create_dropdown(c, false, over_limit, options);
                     c
-            })
+                })
             })
             .await?
             .message()
             .await
             .unwrap();
 
-        let mut collector = message.await_component_interactions(ctx.discord()).build();
+        let mut collector = message.await_component_interactions(ctx.discord()).timeout(TIMEOUT_DURATION).build();
         while let Some(interaction) = collector.next().await {
             match interaction.data.custom_id.as_str() {
                 ANNOUNCEMENT_SELECTOR_DROPDOWN => {
@@ -104,48 +103,12 @@ pub async fn set(
                             .map_err(Into::into),
                         Err(why) => Err(why),
                     };
-                },
+                }
                 ANNOUNCEMENT_SELECTOR_PREV_BUTTON => {
                     index -= 1;
-                    let (options, over_limit) = match create_dropdown_options(ctx, &discord_name, index).await {
-                        Ok(options) => options,
-                        Err(why) => return Err(why),
-                    };
-                    if let Err(why) = interaction
-                            .create_interaction_response(&ctx.discord().http, |response| {
-                                response
-                                    .kind(InteractionResponseType::UpdateMessage)
-                                    .interaction_response_data(|m| {
-                                        m.components(|c| {
-                                            create_dropdown(c, index > 1, over_limit, options);
-                                            c
-                                        })
-                                    })
-                            })
-                            .await {
-                                return Err(Into::into(why));
-                            }
-                },
+                }
                 ANNOUNCEMENT_SELECTOR_NEXT_BUTTON => {
                     index += 1;
-                    let (options, over_limit) = match create_dropdown_options(ctx, &discord_name, index).await {
-                        Ok(options) => options,
-                        Err(why) => return Err(why),
-                    };
-                    if let Err(why) = interaction
-                            .create_interaction_response(&ctx.discord().http, |response| {
-                                response
-                                    .kind(InteractionResponseType::UpdateMessage)
-                                    .interaction_response_data(|m| {
-                                        m.components(|c| {
-                                            create_dropdown(c, index > 1, over_limit, options);
-                                            c
-                                        })
-                                    })
-                            })
-                            .await {
-                                return Err(Into::into(why));
-                            }
                 }
                 _ => {
                     let err_str = "Unknown component interaction".to_string();
@@ -153,12 +116,31 @@ pub async fn set(
                     return send_error(ctx, err_str).await;
                 }
             }
-        } 
-        // else {
-            let err_str = "Failed to wait for component interaction".to_string();
-            warn!("{}", err_str);
-            return send_error(ctx, err_str).await;
-        // }
+
+            let (options, over_limit) = match create_dropdown_options(ctx, &discord_name, index).await {
+                Ok(res) => res,
+                Err(why) => return Err(why),
+            };
+            if let Err(why) = interaction
+                .create_interaction_response(&ctx.discord().http, |response| {
+                    response
+                        .kind(InteractionResponseType::UpdateMessage)
+                        .interaction_response_data(|m| {
+                            m.components(|c| {
+                                create_dropdown(c, index > 1, over_limit, options);
+                                c
+                            })
+                        })
+                })
+                .await
+            {
+                return Err(Into::into(why));
+            }
+        }
+
+        let err_str = "Failed to wait for component interaction".to_string();
+        warn!("{}", err_str);
+        return send_error(ctx, err_str).await;
     }
 }
 
@@ -221,7 +203,7 @@ async fn create_dropdown_options(
                 let err_str = format!("Failed to read directory {}", path_string);
                 error!("{}: {}", err_str, err);
                 return match send_error(ctx, err_str).await {
-                    Ok(_) => Err(Into::into(serenity::Error::Other("Err"))),
+                    Ok(_) => Err(Into::into(err)),
                     Err(why) => Err(why),
                 };
             }
@@ -242,7 +224,7 @@ async fn create_dropdown_options(
                     let err_str = "Failed to get next entry".to_string();
                     error!("{}: {}", err_str, err);
                     return match send_error(ctx, err_str.clone()).await {
-                        Ok(_) => Err(Into::into(serenity::Error::Other("Err"))),
+                        Ok(_) => Err(Into::into(err)),
                         Err(why) => Err(why),
                     };
                 }
@@ -275,7 +257,12 @@ async fn create_dropdown_options(
     return Ok((options, over_limit));
 }
 
-fn create_dropdown(components: &mut CreateComponents, prev: bool, next: bool, options: Vec<CreateSelectMenuOption>) -> () {
+fn create_dropdown(
+    components: &mut CreateComponents,
+    prev: bool,
+    next: bool,
+    options: Vec<CreateSelectMenuOption>,
+) -> () {
     components
         .create_action_row(|r| {
             r.create_select_menu(|s| {
@@ -287,16 +274,14 @@ fn create_dropdown(components: &mut CreateComponents, prev: bool, next: bool, op
         })
         .create_action_row(|r| {
             r.create_button(|b| {
-                b.custom_id(ANNOUNCEMENT_SELECTOR_PREV_BUTTON)
-                    .label("Prev");
+                b.custom_id(ANNOUNCEMENT_SELECTOR_PREV_BUTTON).label("Prev");
                 if !prev {
                     b.disabled(true);
                 }
                 b
             })
             .create_button(|b| {
-                b.custom_id(ANNOUNCEMENT_SELECTOR_NEXT_BUTTON)
-                    .label("Next");
+                b.custom_id(ANNOUNCEMENT_SELECTOR_NEXT_BUTTON).label("Next");
                 if !next {
                     b.disabled(true);
                 }
