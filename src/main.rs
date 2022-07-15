@@ -20,9 +20,6 @@ use serenity::{
         event::ResumedEvent,
         gateway::Ready,
         id::{ChannelId, UserId},
-        interactions::application_command::{
-            ApplicationCommandInteractionDataOptionValue, ApplicationCommandOptionType,
-        },
         prelude::*,
         voice::VoiceState,
     },
@@ -40,7 +37,7 @@ use crate::lib::util::{announce, play_file, print_type_of, voice_channel_is_empt
 
 // Types used by all command functions
 type Error = Box<dyn std::error::Error + Send + Sync>;
-type pContext<'a> = poise::Context<'a, Data, Error>;
+type PContext<'a> = poise::Context<'a, Data, Error>;
 
 // Custom user data passed to all command functions
 pub struct Data {}
@@ -55,137 +52,7 @@ struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::ApplicationCommand(command) = interaction {
-            let (content, embed, components) = match command.data.name.as_str() {
-                "new" => {
-                    let command_option = command.data.options.get(0).expect("Expected command option.");
-
-                    if command_option.kind != ApplicationCommandOptionType::SubCommand {
-                        error!("Expected sub command.");
-                    }
-
-                    let mut res = ("Command not implemented".to_string(), None, None);
-
-                    let user_option = command_option
-                        .options
-                        .get(0)
-                        .expect("Expected user.")
-                        .resolved
-                        .as_ref()
-                        .expect("Expected user obj.");
-                    if let ApplicationCommandInteractionDataOptionValue::User(user, member) = user_option {
-                        let announcement_option = command_option
-                            .options
-                            .get(1)
-                            .expect("Expected announcement.")
-                            .resolved
-                            .as_ref()
-                            .expect("Expected announcement obj.");
-                        if let ApplicationCommandInteractionDataOptionValue::String(announcement) = announcement_option
-                        {
-                            if command_option.name == "file" {
-                                let attachment_option = command_option
-                                    .options
-                                    .get(2)
-                                    .expect("Expected attachment.")
-                                    .resolved
-                                    .as_ref()
-                                    .expect("Expected attachment obj.");
-                                if let ApplicationCommandInteractionDataOptionValue::Attachment(attachment) =
-                                    attachment_option
-                                {
-                                    let filters = match command_option.options.get(3) {
-                                        Some(filters) => {
-                                            let filters_option =
-                                                filters.resolved.as_ref().expect("Expected filters obj.");
-                                            if let ApplicationCommandInteractionDataOptionValue::String(filters) =
-                                                filters_option
-                                            {
-                                                Some(filters)
-                                            } else {
-                                                None
-                                            }
-                                        }
-                                        None => None,
-                                    };
-
-                                    let name = match member {
-                                        Some(member) => match &member.nick {
-                                            Some(nick) => nick.clone(),
-                                            None => user.name.clone(),
-                                        },
-                                        None => user.name.clone(),
-                                    };
-                                    res = new_file(&ctx, &name, announcement, attachment, user, filters).await;
-                                }
-                            } else if command_option.name == "url" {
-                                let url_option = command_option
-                                    .options
-                                    .get(2)
-                                    .expect("Expected url.")
-                                    .resolved
-                                    .as_ref()
-                                    .expect("Expected url obj.");
-                                if let ApplicationCommandInteractionDataOptionValue::String(url) = url_option {
-                                    let start_option = command_option
-                                        .options
-                                        .get(3)
-                                        .expect("Expected start.")
-                                        .resolved
-                                        .as_ref()
-                                        .expect("Expected start obj.");
-                                    if let ApplicationCommandInteractionDataOptionValue::String(start) = start_option {
-                                        let end_option = command_option
-                                            .options
-                                            .get(4)
-                                            .expect("Expected start.")
-                                            .resolved
-                                            .as_ref()
-                                            .expect("Expected start obj.");
-                                        if let ApplicationCommandInteractionDataOptionValue::String(end) = end_option {
-                                            let filters = match command_option.options.get(5) {
-                                                Some(filters) => {
-                                                    let filters_option =
-                                                        filters.resolved.as_ref().expect("Expected filters obj.");
-                                                    if let ApplicationCommandInteractionDataOptionValue::String(
-                                                        filters,
-                                                    ) = filters_option
-                                                    {
-                                                        Some(filters)
-                                                    } else {
-                                                        None
-                                                    }
-                                                }
-                                                None => None,
-                                            };
-
-                                            let name = match member {
-                                                Some(member) => match &member.nick {
-                                                    Some(nick) => nick.clone(),
-                                                    None => user.name.clone(),
-                                                },
-                                                None => user.name.clone(),
-                                            };
-                                            res = new_url(&ctx, &name, announcement, url, start, end, user, filters)
-                                                .await;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    res
-                }
-                _ => ("".to_string(), None, None),
-            };
-        } else if let Interaction::MessageComponent(component) = interaction {
-            // debug!("Received message component interaction");
-        }
-    }
-
-    async fn ready(&self, ctx: Context, ready: Ready) {
+    async fn ready(&self, _ctx: Context, ready: Ready) {
         info!("Connected as {}", ready.user.name);
     }
 
@@ -304,7 +171,7 @@ impl EventHandler for Handler {
 /// Show this help menu
 #[poise::command(prefix_command, track_edits, slash_command)]
 async fn help(
-    ctx: pContext<'_>,
+    ctx: PContext<'_>,
     #[description = "Specific command to show help about"]
     #[autocomplete = "poise::builtins::autocomplete_command"]
     command: Option<String>,
@@ -328,7 +195,7 @@ async fn help(
 
 /// Registers or unregisters application commands in this guild or globally
 #[poise::command(prefix_command, hide_in_help)]
-async fn register(ctx: pContext<'_>) -> Result<(), Error> {
+async fn register(ctx: PContext<'_>) -> Result<(), Error> {
     poise::builtins::register_application_commands_buttons(ctx).await?;
 
     Ok(())
@@ -378,7 +245,7 @@ async fn main() {
                 register(),
                 set(),
                 list(),
-                // new()
+                new(),
             ],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("!".into()),

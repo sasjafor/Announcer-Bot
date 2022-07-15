@@ -3,7 +3,7 @@ use crate::{
         component_ids::{LIST_NEXT_BUTTON, LIST_PREV_BUTTON},
         util::send_error,
     },
-    pContext, Error,
+    PContext, Error,
 };
 use std::{ffi::OsStr, fs, path::Path, time::Duration};
 
@@ -29,7 +29,7 @@ const ELEMENTS_PER_PAGE: usize = 10;
     required_bot_permissions = "SEND_MESSAGES"
 )]
 pub async fn list(
-    ctx: pContext<'_>,
+    ctx: PContext<'_>,
     #[description = "The name for which to list announcements."] name: Option<String>,
     #[description = "The page index."]
     #[min = 1]
@@ -152,7 +152,7 @@ pub async fn list(
 }
 
 async fn create_list(
-    ctx: pContext<'_>,
+    ctx: PContext<'_>,
     path: &Path,
     path_string: &String,
     filename: &Option<String>,

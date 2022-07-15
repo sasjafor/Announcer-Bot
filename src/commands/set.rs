@@ -1,6 +1,6 @@
 use crate::{
     lib::{component_ids::*, util::send_error},
-    pContext, Error,
+    PContext, Error,
 };
 
 use std::{fs, path::Path, time::Duration};
@@ -24,7 +24,7 @@ const ELEMENT_LABEL_LENGTH: usize = 100;
     required_bot_permissions = "SEND_MESSAGES"
 )]
 pub async fn set(
-    ctx: pContext<'_>,
+    ctx: PContext<'_>,
     #[description = "The name for which to set the announcement."] name: Option<String>,
     #[description = "The user for which to set the active announcement."] user: Option<User>,
 ) -> Result<(), Error> {
@@ -145,7 +145,7 @@ pub async fn set(
 }
 
 async fn set_fn(
-    ctx: pContext<'_>,
+    ctx: PContext<'_>,
     announcement_name: &String,
     discord_user: &User,
     discord_name: &String,
@@ -187,7 +187,7 @@ async fn set_fn(
 }
 
 async fn create_dropdown_options(
-    ctx: pContext<'_>,
+    ctx: PContext<'_>,
     discord_name: &String,
     index: usize,
 ) -> Result<(Vec<CreateSelectMenuOption>, bool), Error> {

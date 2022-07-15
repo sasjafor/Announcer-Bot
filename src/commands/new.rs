@@ -1,131 +1,80 @@
 use std::{fs, fs::File, io::prelude::*, path::Path, process::Command, time::Duration};
 
-use serenity::{
-    builder::{CreateApplicationCommand, CreateComponents, CreateEmbed},
-    client::Context,
-    model::{interactions::application_command::ApplicationCommandOptionType, prelude::*},
-};
+use serenity::{model::prelude::*, utils::Colour};
 
 use rusqlite::{params, Connection};
 use tracing::{debug, error};
 use url::Url;
 
-use crate::lib::parse::parse_duration;
+use crate::{
+    lib::{parse::parse_duration, util::send_error},
+    PContext, Error,
+};
 
-pub fn create_new_command(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    return command
-        .name("new")
-        .description("Submit a new announcement either as file or url")
-        .create_option(|option| {
-            option
-                .name("file")
-                .description("Add new announcement using a file.")
-                .kind(ApplicationCommandOptionType::SubCommand)
-                .create_sub_option(|option| {
-                    option
-                        .name("user")
-                        .description("The user for which to add an announcement.")
-                        .kind(ApplicationCommandOptionType::User)
-                        .required(true)
-                })
-                .create_sub_option(|option| {
-                    option
-                        .name("announcement")
-                        .description("Name of the announcement.")
-                        .kind(ApplicationCommandOptionType::String)
-                        .required(true)
-                })
-                .create_sub_option(|option| {
-                    option
-                        .name("file")
-                        .description("Audio file to be used as announcement.")
-                        .kind(ApplicationCommandOptionType::Attachment)
-                        .required(true)
-                })
-                .create_sub_option(|option| {
-                    option
-                        .name("filters")
-                        .description("FFMPEG filters to transform audio.")
-                        .kind(ApplicationCommandOptionType::String)
-                })
-        })
-        .create_option(|option| {
-            option
-                .name("url")
-                .description("Add new announcement using a url.")
-                .kind(ApplicationCommandOptionType::SubCommand)
-                .create_sub_option(|option| {
-                    option
-                        .name("user")
-                        .description("The user for which to add an announcement.")
-                        .kind(ApplicationCommandOptionType::User)
-                        .required(true)
-                })
-                .create_sub_option(|option| {
-                    option
-                        .name("announcement")
-                        .description("Name of the announcement.")
-                        .kind(ApplicationCommandOptionType::String)
-                        .required(true)
-                })
-                .create_sub_option(|option| {
-                    option
-                        .name("url")
-                        .description("URL for the announcement.")
-                        .kind(ApplicationCommandOptionType::String)
-                        .required(true)
-                })
-                .create_sub_option(|option| {
-                    option
-                        .name("start")
-                        .description("Start time.")
-                        .kind(ApplicationCommandOptionType::String)
-                        .required(true)
-                })
-                .create_sub_option(|option| {
-                    option
-                        .name("end")
-                        .description("End time.")
-                        .kind(ApplicationCommandOptionType::String)
-                        .required(true)
-                })
-                .create_sub_option(|option| {
-                    option
-                        .name("filters")
-                        .description("FFMPEG filters to transform audio.")
-                        .kind(ApplicationCommandOptionType::String)
-                })
-        });
+fn new_help() -> String {
+    return "\
+Submit a new announcement either as file or url.
+Usage:  
+!new file <discordname> <announcement-name> [<filters>]
+!new url <discordname> <announcement-name> <url> <start time> <end time> [<filters>]
+
+Examples:
+!new file @Yzarul \"funny noise\"
+!new file @Yzarul \"funny noise\" \"vibrato\"
+!new url @Yzarul \"funny noise\" \"https://www.youtube.com/watch?v=dQw4w9WgXcQ\" 20 25
+!new url @Yzarul \"funny noise\" \"https://www.youtube.com/watch?v=dQw4w9WgXcQ\" 02:20 02:25
+!new url @Yzarul \"funny noise\" \"https://www.youtube.com/watch?v=dQw4w9WgXcQ\" 02:20 02:25 vibrato=d=1.0
+
+See all filters here https://ffmpeg.org/ffmpeg-filters.html
+".to_string()
 }
 
-// #[command]
-// #[description("Submit a new announcement either as file or url")]
-// #[usage("<discordname> <announcement-name> [<filters>]\nnewfile <discordname> <announcement-name> <url> <start time> <duration> [<filters>]")]
-// #[example("\"Mr Yzarul\" \"funny noise\"")]
-// #[example("\"Mr Yzarul\" \"funny noise\" \"vibrato\"")]
-// #[example("\"Mr Yzarul\" \"funny noise\" \"https://www.youtube.com/watch?v=dQw4w9WgXcQ\" 20 7")]
-// #[example("\"Mr Yzarul\" \"funny noise\" \"https://www.youtube.com/watch?v=dQw4w9WgXcQ\" 02:20 4")]
-// #[example("See all filters here https://ffmpeg.org/ffmpeg-filters.html")]
-// #[min_args(2)]
-// #[max_args(6)]
-// #[help_available]
-pub async fn new_file(
-    ctx: &Context,
-    name: &String,
-    announcement_name: &String,
-    audio_file: &Attachment,
-    user: &User,
-    filters: Option<&String>,
-) -> (String, Option<CreateEmbed>, Option<CreateComponents>) {
-    let filename = format!("{}.wav", &name);
+#[doc = "Submit a new announcement either as file or url."]
+#[poise::command(
+    category = "Main Commands",
+    guild_only,
+    prefix_command,
+    slash_command,
+    required_bot_permissions = "SEND_MESSAGES",
+    subcommands("file", "url"),
+    explanation_fn = "new_help"
+)]
+pub async fn new(_ctx: PContext<'_>) -> Result<(), Error> {
+    return Ok(());
+}
+
+#[doc = "Add new announcement using a file."]
+#[poise::command(
+    category = "Main Commands",
+    guild_only,
+    prefix_command,
+    slash_command,
+    required_bot_permissions = "SEND_MESSAGES"
+)]
+pub async fn file(
+    ctx: PContext<'_>,
+    #[description = "The user for which to add an announcement."] user: User,
+    #[description = "Name of the announcement."] announcement: String,
+    #[description = "Audio file to be used as announcement."] file: Attachment,
+    #[description = "FFMPEG filters to transform audio."] filters: Option<String>,
+) -> Result<(), Error> {
+    let discord_name = match ctx.guild_id() {
+        Some(guild_id) => match user.nick_in(&ctx.discord().http, guild_id).await {
+            Some(nick) => nick,
+            None => user.name.clone(),
+        },
+        None => user.name.clone(),
+    };
+
+    let filename = format!("{}.wav", &announcement);
     let processing_path = "/config/processing/";
 
-    let content = match audio_file.download().await {
+    let content = match file.download().await {
         Ok(content) => content,
         Err(why) => {
             let err_str = "Error downloading attachment".to_string();
             error!("{}: {}", err_str, why);
-            return (err_str, None, None);
+            return send_error(ctx, err_str).await;
         }
     };
 
@@ -134,61 +83,76 @@ pub async fn new_file(
         Err(why) => {
             let err_str = "Error creating file".to_string();
             error!("{}: {}", err_str, why);
-            return (err_str, None, None);
+            return send_error(ctx, err_str).await;
         }
     };
 
     if let Err(why) = file.write(&content) {
         let err_str = "Error writing file".to_string();
         error!("{}: {}", err_str, why);
-        return (err_str, None, None);
+        return send_error(ctx, err_str).await;
     }
 
-    return new(ctx, name, announcement_name, user, filters).await;
+    return add_new_file(ctx, &discord_name, &announcement, &user, filters.as_ref()).await;
 }
 
-pub async fn new_url(
-    ctx: &Context,
-    name: &String,
-    announcement_name: &String,
-    url: &String,
-    start: &String,
-    end: &String,
-    user: &User,
-    filters: Option<&String>,
-) -> (String, Option<CreateEmbed>, Option<CreateComponents>) {
-    let filename = format!("{}.wav", &name);
+#[doc = "Add new announcement using a url."]
+#[poise::command(
+    category = "Main Commands",
+    guild_only,
+    prefix_command,
+    slash_command,
+    required_bot_permissions = "SEND_MESSAGES"
+)]
+pub async fn url(
+    ctx: PContext<'_>,
+    #[description = "The user for which to add an announcement."] user: User,
+    #[description = "Name of the announcement."] announcement: String,
+    #[description = "URL for the announcement."] url: String,
+    #[description = "Start time."] start: String,
+    #[description = "End time."] end: String,
+    #[description = "FFMPEG filters to transform audio."] filters: Option<String>,
+) -> Result<(), Error> {
+    let discord_name = match ctx.guild_id() {
+        Some(guild_id) => match user.nick_in(&ctx.discord().http, guild_id).await {
+            Some(nick) => nick,
+            None => user.name.clone(),
+        },
+        None => user.name.clone(),
+    };
+
+    let filename = format!("{}.wav", &announcement);
     let processing_path = "/config/processing/";
 
-    let _ = match Url::parse(url) {
+    let _ = match Url::parse(&url) {
         Ok(url) => url,
         Err(why) => {
             let err_str = "Please provide a valid url".to_string();
             error!("{}: {}", err_str, why);
-            return (err_str, None, None);
+            return send_error(ctx, err_str).await;
         }
     };
 
-    let start_parsed = parse_duration(start).unwrap();
-    let end_parsed = parse_duration(end).unwrap();
+    let start_parsed = parse_duration(&start).unwrap();
+    let end_parsed = parse_duration(&end).unwrap();
     let duration = end_parsed - start_parsed;
 
     if duration > Duration::from_secs(7) {
         let err_str = "Duration is too long".to_string();
         debug!("{}: {}", err_str, duration.as_secs_f64());
-        return (err_str, None, None);
+        return send_error(ctx, err_str).await;
     }
 
     let youtube_url = Command::new("youtube-dl")
         .arg("-g")
-        .arg(url)
+        .arg(&url)
         .output()
         .expect("Failed to run youtube-dl");
 
     if !youtube_url.status.success() {
         let err_str = "Youtube-dl Error: It likely needs an update".to_string();
-        error!("{}: url = {} err: {}", err_str, url, youtube_url.status);
-        return (err_str, None, None);
+        error!("{}: url = {} err: {}", err_str, &url, youtube_url.status);
+        return send_error(ctx, err_str).await;
     }
 
     let youtube_dloutput = match String::from_utf8(youtube_url.stdout) {
@@ -196,7 +160,7 @@ pub async fn new_url(
         Err(why) => {
             let err_str = "Failed to parse youtube-dl output".to_string();
             error!("{}: {}", err_str, why);
-            return (err_str, None, None);
+            return send_error(ctx, err_str).await;
         }
     };
     let lines = youtube_dloutput.lines();
@@ -206,7 +170,7 @@ pub async fn new_url(
         None => {
             let err_str = "Youtube empty info".to_string();
             error!("{}: {}", err_str, url);
-            return (err_str, None, None);
+            return send_error(ctx, err_str).await;
         }
     };
 
@@ -235,21 +199,21 @@ pub async fn new_url(
             &filename,
             download_status.code().expect("no exit code")
         );
-        return (err_str, None, None);
+        return send_error(ctx, err_str).await;
     }
 
-    return new(ctx, name, announcement_name, user, filters).await;
+    return add_new_file(ctx, &discord_name, &announcement, &user, filters.as_ref()).await;
 }
 
-pub async fn new(
-    _ctx: &Context,
+pub async fn add_new_file(
+    ctx: PContext<'_>,
     name: &String,
     announcement_name: &String,
     user: &User,
     filters: Option<&String>,
-) -> (String, Option<CreateEmbed>, Option<CreateComponents>) {
-    let filename = format!("{}.wav", &name);
-    let processed_filename = format!("{}{}", &name, ".processed.wav");
+) -> Result<(), Error> {
+    let filename = format!("{}.wav", &announcement_name);
+    let processed_filename = format!("{}{}", &announcement_name, ".processed.wav");
     let processing_path = "/config/processing/";
     let indexed_path = "/config/index/";
     let db_path = Path::new("/config/database/db.sqlite");
@@ -278,7 +242,12 @@ pub async fn new(
         .output()
         .expect("Failed to run ffmpeg");
 
-    debug!("ffmpeg -y -t 00:00:06 -i {} -filter:a {} -ar 48000 -f wav {}", format!("file:{}", &filename), &normalize_and_filter_string, format!("file:{}", &processed_filename));
+    debug!(
+        "ffmpeg -y -t 00:00:06 -i {} -filter:a {} -ar 48000 -f wav {}",
+        format!("file:{}", &filename),
+        &normalize_and_filter_string,
+        format!("file:{}", &processed_filename)
+    );
 
     if !filter_output.status.success() {
         // let _ = delete_processing_files(&processing_path, &filename, &processed_filename);
@@ -290,7 +259,7 @@ pub async fn new(
             &filename,
             filter_output.status.code().expect("no exit code")
         );
-        return (err_str, None, None);
+        return send_error(ctx, err_str).await;
     }
 
     let name_path = format!("{}{}", &indexed_path, &name);
@@ -304,22 +273,20 @@ pub async fn new(
         Err(why) => {
             let err_str = "Failed to open database".to_string();
             error!("{}: {}", err_str, why);
-            return (err_str, None, None);
+            return send_error(ctx, err_str).await;
         }
     };
 
     let user_id = user.id.as_u64();
-    let _ = match db.execute(
+    let insert_res = db.execute(
         "INSERT OR REPLACE INTO names (name, user_id, active_file)
             VALUES (?1, ?2, ?3)",
         params![&name, *user_id as i64, announcement_name],
-    ) {
-        Ok(_) => (),
-        Err(why) => {
+    );
+    if insert_res.is_err() {
             let err_str = "Failed to insert new name".to_string();
-            error!("{}: {}", err_str, why);
-            return (err_str, None, None);
-        }
+            error!("{}: {}", err_str, insert_res.err().unwrap());
+            return send_error(ctx, err_str).await;
     };
 
     let _ = match fs::rename(
@@ -331,7 +298,7 @@ pub async fn new(
             let _ = delete_processing_files(&processing_path, &filename, &processed_filename);
             let err_str = "Failed to rename file".to_string();
             error!("{} for file {}: {}", err_str, &processed_filename, why);
-            return (err_str, None, None);
+            return send_error(ctx, err_str).await;
         }
     };
 
@@ -346,7 +313,16 @@ pub async fn new(
 
     let _ = delete_processing_files(&processing_path, &filename, &processed_filename);
 
-    return (format!("Successfully added new file for {}", name), None, None);
+    ctx.send(|m| {
+        m.embed(|e| {
+            e.title(format!("Successfully added new file for {}", name))
+                .description(format!("`{}` [{}]", &announcement_name, &user.mention()))
+                .colour(Colour::from_rgb(128, 128, 128))
+        })
+    })
+    .await
+    .map(drop)
+    .map_err(Into::into)
 }
 
 fn delete_processing_files(processing_path: &str, filename: &str, processed_filename: &str) {

@@ -1,4 +1,4 @@
-use crate::{pContext, Error};
+use crate::{PContext, Error};
 
 use rand::{distributions::Uniform, prelude::Distribution};
 use rusqlite::{params, Connection, OptionalExtension};
@@ -197,6 +197,6 @@ pub fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
 }
 
-pub async fn send_error(ctx: pContext<'_>, content: String) -> Result<(), Error> {
-    ctx.send(|m| m.content(content)).await.map(drop).map_err(Into::into)
+pub async fn send_error(ctx: PContext<'_>, content: String) -> Result<(), Error> {
+    ctx.send(|m| m.content(content).ephemeral(true)).await.map(drop).map_err(Into::into)
 }
