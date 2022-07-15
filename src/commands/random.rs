@@ -1,18 +1,9 @@
+use rusqlite::{params, Connection};
 use std::path::Path;
 
-use serenity::{
-    model::prelude::*,
-    utils::Colour,
-};
+use serenity::{model::prelude::*, utils::Colour};
 
-use tracing::error;
-
-use rusqlite::{params, Connection};
-
-use crate::{
-    lib::{util::send_error},
-    Error, PContext,
-};
+use crate::{lib::util::send_error, PContext, PError};
 
 #[doc = "Toggle randomised mode."]
 #[poise::command(
@@ -22,7 +13,7 @@ use crate::{
     slash_command,
     required_bot_permissions = "SEND_MESSAGES"
 )]
-pub async fn random(ctx: PContext<'_>) -> Result<(), Error> {
+pub async fn random(ctx: PContext<'_>) -> Result<(), PError> {
     let name = match ctx.author_member().await {
         Some(member) => member.display_name().into_owned(),
         None => ctx.author().name.clone(),
@@ -34,8 +25,7 @@ pub async fn random(ctx: PContext<'_>) -> Result<(), Error> {
         Ok(db) => db,
         Err(why) => {
             let err_str = format!("Failed to open database");
-            error!("{}: {}", err_str, why);
-            return send_error(ctx, err_str).await;
+            return send_error(ctx, err_str, why.to_string()).await;
         }
     };
 
@@ -48,8 +38,7 @@ pub async fn random(ctx: PContext<'_>) -> Result<(), Error> {
     if update_res.is_err() {
         let why = update_res.err().unwrap();
         let err_str = format!("Failed to random for name {}", &name);
-        error!("{}: {}", err_str, why);
-        return send_error(ctx, err_str).await;
+        return send_error(ctx, err_str, why.to_string()).await;
     };
 
     ctx.send(|m| {

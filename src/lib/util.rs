@@ -1,5 +1,3 @@
-use crate::{PContext, Error};
-
 use rand::{distributions::Uniform, prelude::Distribution};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::{
@@ -7,7 +5,7 @@ use std::{
     path::Path,
     process::Command,
 };
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 use serenity::{
     client::Context,
@@ -17,13 +15,9 @@ use serenity::{
     },
 };
 
-pub async fn announce(
-    ctx: &Context,
-    channel_id: ChannelId,
-    guild_id: GuildId,
-    name: &str,
-    user_id: u64,
-) {
+use crate::{PContext, PError};
+
+pub async fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, name: &str, user_id: u64) {
     let db_path = Path::new("/config/database/db.sqlite");
 
     let db = match Connection::open(&db_path) {
@@ -44,10 +38,7 @@ pub async fn announce(
     {
         Ok(row) => row,
         Err(err) => {
-            error!(
-                "Failed to query active file for {}, Error Code {}",
-                name, err
-            );
+            error!("Failed to query active file for {}, Error Code {}", name, err);
             return;
         }
     };
@@ -63,10 +54,7 @@ pub async fn announce(
         ) {
             Ok(row) => row,
             Err(err) => {
-                error!(
-                    "Failed to query random file for {}, Error Code {}",
-                    name, err
-                );
+                error!("Failed to query random file for {}, Error Code {}", name, err);
                 return;
             }
         };
@@ -78,14 +66,7 @@ pub async fn announce(
             let index = between.sample(&mut rng);
 
             let mut paths = read_dir(&index_base_path).unwrap();
-            path = paths
-                .nth(index)
-                .unwrap()
-                .unwrap()
-                .path()
-                .to_str()
-                .unwrap()
-                .to_owned();
+            path = paths.nth(index).unwrap().unwrap().path().to_str().unwrap().to_owned();
         } else {
             path = format!("{}/{}.wav", &index_base_path, &filename.unwrap());
         }
@@ -108,9 +89,7 @@ pub async fn play_file(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, 
     let mut handler = handler_lock.lock().await;
 
     let songbird_channel_id = songbird::id::ChannelId(channel_id.0);
-    if handler.current_channel().is_none()
-        || handler.current_channel().unwrap() != songbird_channel_id
-    {
+    if handler.current_channel().is_none() || handler.current_channel().unwrap() != songbird_channel_id {
         let handler_res = match handler.join(songbird_channel_id).await {
             Ok(res) => res,
             Err(err) => {
@@ -125,10 +104,7 @@ pub async fn play_file(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, 
         let _ = match handler_res.await {
             Ok(_res) => _res,
             Err(err) => {
-                error!(
-                    "Failed to connect to channel with id {} with err {}",
-                    channel_id, err
-                );
+                error!("Failed to connect to channel with id {} with err {}", channel_id, err);
                 return;
             }
         };
@@ -183,10 +159,7 @@ pub fn check_path(path: &str, name: &str) {
         let _ = match fs::write(&text_path, name) {
             Ok(()) => (),
             Err(err) => {
-                error!(
-                    "Unable to write file {} for name: {} err: {}",
-                    &text_path, &name, &err
-                );
+                error!("Unable to write file {} for name: {} err: {}", &text_path, &name, &err);
                 return;
             }
         };
@@ -197,6 +170,26 @@ pub fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
 }
 
-pub async fn send_error(ctx: PContext<'_>, content: String) -> Result<(), Error> {
-    ctx.send(|m| m.content(content).ephemeral(true)).await.map(drop).map_err(Into::into)
+pub async fn send_debug(ctx: PContext<'_>, content: String, err: String) -> Result<(), PError> {
+    debug!("{}: {}", content, err);
+    ctx.send(|m| m.content(content).ephemeral(true))
+        .await
+        .map(drop)
+        .map_err(Into::into)
+}
+
+pub async fn send_warning(ctx: PContext<'_>, content: String, err: String) -> Result<(), PError> {
+    warn!("{}: {}", content, err);
+    ctx.send(|m| m.content(content).ephemeral(true))
+        .await
+        .map(drop)
+        .map_err(Into::into)
+}
+
+pub async fn send_error(ctx: PContext<'_>, content: String, err: String) -> Result<(), PError> {
+    error!("{}: {}", content, err);
+    ctx.send(|m| m.content(content).ephemeral(true))
+        .await
+        .map(drop)
+        .map_err(Into::into)
 }

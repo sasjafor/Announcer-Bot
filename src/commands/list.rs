@@ -1,20 +1,21 @@
-use crate::{
-    lib::{
-        component_ids::{LIST_NEXT_BUTTON, LIST_PREV_BUTTON},
-        util::send_error,
-    },
-    PContext, Error,
-};
+use rusqlite::{params, Connection, OptionalExtension};
 use std::{ffi::OsStr, fs, path::Path, time::Duration};
+use tracing::debug;
 
-use poise::{futures_util::StreamExt, serenity_prelude::CreateComponents};
+use poise::futures_util::StreamExt;
 use serenity::{
+    builder::CreateComponents,
     model::{interactions::message_component::ButtonStyle, prelude::*},
     utils::Colour,
 };
 
-use rusqlite::{params, Connection, OptionalExtension};
-use tracing::{debug, error};
+use crate::{
+    lib::{
+        component_ids::{LIST_NEXT_BUTTON, LIST_PREV_BUTTON},
+        util::{send_debug, send_error},
+    },
+    PContext, PError,
+};
 
 const TIMEOUT_DURATION: Duration = Duration::from_secs(300);
 const EMBED_DESCRIPTION_MAX_LENGTH: usize = 4096;
@@ -34,7 +35,7 @@ pub async fn list(
     #[description = "The page index."]
     #[min = 1]
     index: Option<usize>,
-) -> Result<(), Error> {
+) -> Result<(), PError> {
     let name = match name {
         Some(name) => name,
         None => {
@@ -54,10 +55,9 @@ pub async fn list(
 
     let db = match Connection::open(&db_path) {
         Ok(db) => db,
-        Err(err) => {
+        Err(why) => {
             let err_str = "Failed to open database:".to_string();
-            error!("{}: {}", err_str, err);
-            return send_error(ctx, err_str).await;
+            return send_error(ctx, err_str, why.to_string()).await;
         }
     };
 
@@ -68,9 +68,9 @@ pub async fn list(
         .optional();
 
     if filename_res.is_err() {
+        let why = filename_res.err().unwrap();
         let err_str = format!("Failed to query active file for {}", name);
-        error!("{}: {}", err_str, filename_res.err().unwrap());
-        return send_error(ctx, err_str).await;
+        return send_error(ctx, err_str, why.to_string()).await;
     }
     let filename = filename_res.unwrap();
 
@@ -98,7 +98,10 @@ pub async fn list(
             .await
             .unwrap();
 
-        let mut collector = message.await_component_interactions(ctx.discord()).timeout(TIMEOUT_DURATION).build();
+        let mut collector = message
+            .await_component_interactions(ctx.discord())
+            .timeout(TIMEOUT_DURATION)
+            .build();
         while let Some(interaction) = collector.next().await {
             match interaction.data.custom_id.as_str() {
                 LIST_PREV_BUTTON => {
@@ -108,9 +111,9 @@ pub async fn list(
                     index += 1;
                 }
                 _ => {
+                    let why = &interaction.data.custom_id;
                     let err_str = "Unknown component interaction".to_string();
-                    debug!("{}", err_str);
-                    return send_error(ctx, err_str).await;
+                    return send_debug(ctx, err_str, why.to_string()).await;
                 }
             }
             let (content, last_page_index) = match create_list(ctx, path, &path_string, &filename, index).await {
@@ -145,9 +148,9 @@ pub async fn list(
         let _ = message.delete(&ctx.discord().http).await;
         return Ok(());
     } else {
+        let why = name;
         let err_str = "This name doesn't exist".to_string();
-        debug!("{}: {}", err_str, name);
-        return send_error(ctx, err_str).await;
+        return send_debug(ctx, err_str, why.to_string()).await;
     }
 }
 
@@ -157,14 +160,13 @@ async fn create_list(
     path_string: &String,
     filename: &Option<String>,
     index: usize,
-) -> Result<(String, usize), Error> {
+) -> Result<(String, usize), PError> {
     let mut dir_iterator = match fs::read_dir(path) {
         Ok(dir_iterator) => dir_iterator,
-        Err(err) => {
+        Err(why) => {
             let err_str = format!("Failed to read directory {}", path_string);
-            error!("{}: {}", err_str, err);
-            return match send_error(ctx, err_str).await {
-                Ok(_) => Err(Into::into(err)),
+            return match send_error(ctx, err_str, why.to_string()).await {
+                Ok(_) => Err(Into::into(why)),
                 Err(why) => Err(why),
             };
         }
@@ -173,20 +175,19 @@ async fn create_list(
     let entry_count = dir_iterator.count();
     dir_iterator = match fs::read_dir(path) {
         Ok(dir_iterator) => dir_iterator,
-        Err(err) => {
+        Err(why) => {
             let err_str = format!("Failed to read directory {}", path_string);
-            error!("{}: {}", err_str, err);
-            return match send_error(ctx, err_str).await {
-                Ok(_) => Err(Into::into(err)),
+            return match send_error(ctx, err_str, why.to_string()).await {
+                Ok(_) => Err(Into::into(why)),
                 Err(why) => Err(why),
             };
         }
     };
     let last_page_index = (entry_count as f64 / ELEMENTS_PER_PAGE as f64).ceil() as usize;
     if index > last_page_index {
+        let why = index;
         let err_str = "Index too large, provide a valid index.".to_string();
-        debug!("{}: {}", err_str, index);
-        return match send_error(ctx, err_str).await {
+        return match send_debug(ctx, err_str, why.to_string()).await {
             Ok(_) => Err(Into::into(serenity::Error::Other("Err"))),
             Err(why) => Err(why),
         };
@@ -211,11 +212,10 @@ async fn create_list(
 
         let entry_value = match entry {
             Ok(entry) => entry,
-            Err(err) => {
+            Err(why) => {
                 let err_str = "Failed to get next entry".to_string();
-                error!("{}: {}", err_str, err);
-                return match send_error(ctx, err_str).await {
-                    Ok(_) => Err(Into::into(err)),
+                return match send_error(ctx, err_str, why.to_string()).await {
+                    Ok(_) => Err(Into::into(why)),
                     Err(why) => Err(why),
                 };
             }
@@ -239,9 +239,9 @@ async fn create_list(
             break;
         }
         if msg_len + line_len > EMBED_DESCRIPTION_MAX_LENGTH {
+            let why = msg_len + line_len;
             let err_str = "Embed too long".to_string();
-            debug!("{}: {}", err_str, msg_len + line_len);
-            return match send_error(ctx, err_str).await {
+            return match send_debug(ctx, err_str, why.to_string()).await {
                 Ok(_) => Err(Into::into("Err")),
                 Err(why) => Err(why),
             };

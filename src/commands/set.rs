@@ -1,15 +1,21 @@
-use crate::{
-    lib::{component_ids::*, util::send_error},
-    PContext, Error,
+use rusqlite::{params, Connection};
+use std::{fs, path::Path, time::Duration};
+use tracing::debug;
+
+use poise::futures_util::StreamExt;
+use serenity::{
+    builder::{CreateComponents, CreateSelectMenuOption},
+    model::prelude::*,
+    utils::Colour,
 };
 
-use std::{fs, path::Path, time::Duration};
-
-use poise::{futures_util::StreamExt, serenity_prelude::CreateComponents};
-use serenity::{builder::CreateSelectMenuOption, model::prelude::*, utils::Colour};
-
-use rusqlite::{params, Connection};
-use tracing::{debug, error, warn};
+use crate::{
+    lib::{
+        component_ids::*,
+        util::{send_debug, send_error, send_warning},
+    },
+    PContext, PError,
+};
 
 const TIMEOUT_DURATION: Duration = Duration::from_secs(300);
 const ELEMENTS_PER_MENU: usize = 25;
@@ -27,7 +33,7 @@ pub async fn set(
     ctx: PContext<'_>,
     #[description = "The name for which to set the announcement."] name: Option<String>,
     #[description = "The user for which to set the active announcement."] user: Option<User>,
-) -> Result<(), Error> {
+) -> Result<(), PError> {
     let discord_user = match user {
         Some(user) => user,
         None => ctx.author().clone(),
@@ -74,7 +80,10 @@ pub async fn set(
             .await
             .unwrap();
 
-        let mut collector = message.await_component_interactions(ctx.discord()).timeout(TIMEOUT_DURATION).build();
+        let mut collector = message
+            .await_component_interactions(ctx.discord())
+            .timeout(TIMEOUT_DURATION)
+            .build();
         while let Some(interaction) = collector.next().await {
             match interaction.data.custom_id.as_str() {
                 ANNOUNCEMENT_SELECTOR_DROPDOWN => {
@@ -111,9 +120,9 @@ pub async fn set(
                     index += 1;
                 }
                 _ => {
+                    let why = &interaction.data.custom_id;
                     let err_str = "Unknown component interaction".to_string();
-                    debug!("{}", err_str);
-                    return send_error(ctx, err_str).await;
+                    return send_error(ctx, err_str, why.to_string()).await;
                 }
             }
 
@@ -138,9 +147,10 @@ pub async fn set(
             }
         }
 
-        let err_str = "Failed to wait for component interaction".to_string();
-        warn!("{}", err_str);
-        return send_error(ctx, err_str).await;
+        let err_str = "Timeout".to_string();
+        debug!("{}", err_str);
+        let _ = message.delete(&ctx.discord().http).await;
+        return Ok(());
     }
 }
 
@@ -149,14 +159,14 @@ async fn set_fn(
     announcement_name: &String,
     discord_user: &User,
     discord_name: &String,
-) -> Result<(), Error> {
+) -> Result<(), PError> {
     let path_string = format!("/config/index/{}/{}.wav", discord_name, announcement_name);
     let path = Path::new(&path_string);
 
     if !path.exists() {
+        let why = "File doesn't exist.";
         let err_str = "Please choose a valid announcement".to_string();
-        debug!("{}: {}", err_str, "File doesn't exist.");
-        return send_error(ctx, err_str).await;
+        return send_debug(ctx, err_str, why.to_string()).await;
     }
 
     let db_path = Path::new("/config/database/db.sqlite");
@@ -165,8 +175,7 @@ async fn set_fn(
         Ok(db) => db,
         Err(why) => {
             let err_str = "Failed to open database".to_string();
-            error!("{}: {}", err_str, why);
-            return send_error(ctx, err_str).await;
+            return send_error(ctx, err_str, why.to_string()).await;
         }
     };
 
@@ -178,9 +187,9 @@ async fn set_fn(
     );
 
     if insert_res.is_err() {
+        let why = insert_res.err().unwrap();
         let err_str = "Failed to insert new name".to_string();
-        error!("{}: {}", err_str, insert_res.err().unwrap());
-        return send_error(ctx, err_str).await;
+        return send_error(ctx, err_str, why.to_string()).await;
     };
 
     Ok(())
@@ -190,7 +199,7 @@ async fn create_dropdown_options(
     ctx: PContext<'_>,
     discord_name: &String,
     index: usize,
-) -> Result<(Vec<CreateSelectMenuOption>, bool), Error> {
+) -> Result<(Vec<CreateSelectMenuOption>, bool), PError> {
     let mut options = vec![];
     let mut over_limit = false;
 
@@ -199,11 +208,10 @@ async fn create_dropdown_options(
     if path.is_dir() {
         let dir_iterator = match fs::read_dir(path) {
             Ok(dir_iterator) => dir_iterator,
-            Err(err) => {
+            Err(why) => {
                 let err_str = format!("Failed to read directory {}", path_string);
-                error!("{}: {}", err_str, err);
-                return match send_error(ctx, err_str).await {
-                    Ok(_) => Err(Into::into(err)),
+                return match send_error(ctx, err_str, why.to_string()).await {
+                    Ok(_) => Err(Into::into(why)),
                     Err(why) => Err(why),
                 };
             }
@@ -220,11 +228,10 @@ async fn create_dropdown_options(
 
             let entry_value = match entry {
                 Ok(entry) => entry,
-                Err(err) => {
+                Err(why) => {
                     let err_str = "Failed to get next entry".to_string();
-                    error!("{}: {}", err_str, err);
-                    return match send_error(ctx, err_str.clone()).await {
-                        Ok(_) => Err(Into::into(err)),
+                    return match send_error(ctx, err_str, why.to_string()).await {
+                        Ok(_) => Err(Into::into(why)),
                         Err(why) => Err(why),
                     };
                 }
@@ -232,9 +239,9 @@ async fn create_dropdown_options(
             let announcement_name = entry_value.path().file_stem().unwrap().to_string_lossy().to_string();
             // limit length
             if announcement_name.chars().count() > ELEMENT_LABEL_LENGTH {
+                let why = announcement_name.len();
                 let err_str = format!("Announcement name is too long {}", announcement_name);
-                warn!("{}: {}", err_str, announcement_name.len());
-                return match send_error(ctx, err_str.clone()).await {
+                return match send_warning(ctx, err_str, why.to_string()).await {
                     Ok(_) => Err(Into::into(serenity::Error::Other("Err"))),
                     Err(why) => Err(why),
                 };

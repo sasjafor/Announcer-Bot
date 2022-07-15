@@ -27,7 +27,7 @@ use serenity::{
 };
 
 use rusqlite::{params, Connection};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 use commands::{list::*, new::*, random::*, set::*};
 
@@ -36,8 +36,8 @@ use lib::check::can_connect;
 use crate::lib::util::{announce, play_file, print_type_of, voice_channel_is_empty};
 
 // Types used by all command functions
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type PContext<'a> = poise::Context<'a, Data, Error>;
+type PError = Box<dyn std::error::Error + Send + Sync>;
+type PContext<'a> = poise::Context<'a, Data, PError>;
 
 // Custom user data passed to all command functions
 pub struct Data {}
@@ -175,7 +175,7 @@ async fn help(
     #[description = "Specific command to show help about"]
     #[autocomplete = "poise::builtins::autocomplete_command"]
     command: Option<String>,
-) -> Result<(), Error> {
+) -> Result<(), PError> {
     poise::builtins::help(
         ctx,
         command.as_deref(),
@@ -195,13 +195,13 @@ async fn help(
 
 /// Registers or unregisters application commands in this guild or globally
 #[poise::command(prefix_command, hide_in_help)]
-async fn register(ctx: PContext<'_>) -> Result<(), Error> {
+async fn register(ctx: PContext<'_>) -> Result<(), PError> {
     poise::builtins::register_application_commands_buttons(ctx).await?;
 
     Ok(())
 }
 
-async fn on_error(error: poise::FrameworkError<'_, Data, Error>) {
+async fn on_error(error: poise::FrameworkError<'_, Data, PError>) {
     // This is our custom error handler
     // They are many errors that can occur, so we only handle the ones we want to customize
     // and forward the rest to the default handler

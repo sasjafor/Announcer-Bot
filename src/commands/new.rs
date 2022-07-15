@@ -1,14 +1,16 @@
+use rusqlite::{params, Connection};
 use std::{fs, fs::File, io::prelude::*, path::Path, process::Command, time::Duration};
+use tracing::debug;
+use url::Url;
 
 use serenity::{model::prelude::*, utils::Colour};
 
-use rusqlite::{params, Connection};
-use tracing::{debug, error};
-use url::Url;
-
 use crate::{
-    lib::{parse::parse_duration, util::send_error},
-    PContext, Error,
+    lib::{
+        parse::parse_duration,
+        util::{send_debug, send_error},
+    },
+    PContext, PError,
 };
 
 fn new_help() -> String {
@@ -26,7 +28,8 @@ Examples:
 !new url @Yzarul \"funny noise\" \"https://www.youtube.com/watch?v=dQw4w9WgXcQ\" 02:20 02:25 vibrato=d=1.0
 
 See all filters here https://ffmpeg.org/ffmpeg-filters.html
-".to_string()
+"
+    .to_string();
 }
 
 #[doc = "Submit a new announcement either as file or url."]
@@ -39,7 +42,7 @@ See all filters here https://ffmpeg.org/ffmpeg-filters.html
     subcommands("file", "url"),
     explanation_fn = "new_help"
 )]
-pub async fn new(_ctx: PContext<'_>) -> Result<(), Error> {
+pub async fn new(_ctx: PContext<'_>) -> Result<(), PError> {
     return Ok(());
 }
 
@@ -57,7 +60,7 @@ pub async fn file(
     #[description = "Name of the announcement."] announcement: String,
     #[description = "Audio file to be used as announcement."] file: Attachment,
     #[description = "FFMPEG filters to transform audio."] filters: Option<String>,
-) -> Result<(), Error> {
+) -> Result<(), PError> {
     let discord_name = match ctx.guild_id() {
         Some(guild_id) => match user.nick_in(&ctx.discord().http, guild_id).await {
             Some(nick) => nick,
@@ -73,8 +76,7 @@ pub async fn file(
         Ok(content) => content,
         Err(why) => {
             let err_str = "Error downloading attachment".to_string();
-            error!("{}: {}", err_str, why);
-            return send_error(ctx, err_str).await;
+            return send_error(ctx, err_str, why.to_string()).await;
         }
     };
 
@@ -82,15 +84,13 @@ pub async fn file(
         Ok(file) => file,
         Err(why) => {
             let err_str = "Error creating file".to_string();
-            error!("{}: {}", err_str, why);
-            return send_error(ctx, err_str).await;
+            return send_error(ctx, err_str, why.to_string()).await;
         }
     };
 
     if let Err(why) = file.write(&content) {
         let err_str = "Error writing file".to_string();
-        error!("{}: {}", err_str, why);
-        return send_error(ctx, err_str).await;
+        return send_error(ctx, err_str, why.to_string()).await;
     }
 
     return add_new_file(ctx, &discord_name, &announcement, &user, filters.as_ref()).await;
@@ -112,7 +112,7 @@ pub async fn url(
     #[description = "Start time."] start: String,
     #[description = "End time."] end: String,
     #[description = "FFMPEG filters to transform audio."] filters: Option<String>,
-) -> Result<(), Error> {
+) -> Result<(), PError> {
     let discord_name = match ctx.guild_id() {
         Some(guild_id) => match user.nick_in(&ctx.discord().http, guild_id).await {
             Some(nick) => nick,
@@ -128,8 +128,7 @@ pub async fn url(
         Ok(url) => url,
         Err(why) => {
             let err_str = "Please provide a valid url".to_string();
-            error!("{}: {}", err_str, why);
-            return send_error(ctx, err_str).await;
+            return send_error(ctx, err_str, why.to_string()).await;
         }
     };
 
@@ -138,9 +137,9 @@ pub async fn url(
     let duration = end_parsed - start_parsed;
 
     if duration > Duration::from_secs(7) {
+        let why = duration.as_secs_f64();
         let err_str = "Duration is too long".to_string();
-        debug!("{}: {}", err_str, duration.as_secs_f64());
-        return send_error(ctx, err_str).await;
+        return send_debug(ctx, err_str, why.to_string()).await;
     }
 
     let youtube_url = Command::new("youtube-dl")
@@ -150,17 +149,16 @@ pub async fn url(
         .expect("Failed to run youtube-dl");
 
     if !youtube_url.status.success() {
-        let err_str = "Youtube-dl Error: It likely needs an update".to_string();
-        error!("{}: url = {} err: {}", err_str, &url, youtube_url.status);
-        return send_error(ctx, err_str).await;
+        let why = youtube_url.status;
+        let err_str = format!("Youtube-dl Error: It likely needs an update, url = {}", &url);
+        return send_error(ctx, err_str, why.to_string()).await;
     }
 
     let youtube_dloutput = match String::from_utf8(youtube_url.stdout) {
         Ok(res) => res,
         Err(why) => {
             let err_str = "Failed to parse youtube-dl output".to_string();
-            error!("{}: {}", err_str, why);
-            return send_error(ctx, err_str).await;
+            return send_error(ctx, err_str, why.to_string()).await;
         }
     };
     let lines = youtube_dloutput.lines();
@@ -168,9 +166,9 @@ pub async fn url(
     let audio_url = match lines.last() {
         Some(line) => line,
         None => {
+            let why = url;
             let err_str = "Youtube empty info".to_string();
-            error!("{}: {}", err_str, url);
-            return send_error(ctx, err_str).await;
+            return send_error(ctx, err_str, why.to_string()).await;
         }
     };
 
@@ -192,14 +190,9 @@ pub async fn url(
         .status;
 
     if !download_status.success() {
-        let err_str = "Failed to run ffmpeg to download audio".to_string();
-        error!(
-            "{} for file {}, error_code = {}",
-            err_str,
-            &filename,
-            download_status.code().expect("no exit code")
-        );
-        return send_error(ctx, err_str).await;
+        let why = download_status.code().expect("no exit code");
+        let err_str = format!("Failed to run ffmpeg to download audio for file {}", &filename);
+        return send_error(ctx, err_str, why.to_string()).await;
     }
 
     return add_new_file(ctx, &discord_name, &announcement, &user, filters.as_ref()).await;
@@ -211,7 +204,7 @@ pub async fn add_new_file(
     announcement_name: &String,
     user: &User,
     filters: Option<&String>,
-) -> Result<(), Error> {
+) -> Result<(), PError> {
     let filename = format!("{}.wav", &announcement_name);
     let processed_filename = format!("{}{}", &announcement_name, ".processed.wav");
     let processing_path = "/config/processing/";
@@ -250,16 +243,10 @@ pub async fn add_new_file(
     );
 
     if !filter_output.status.success() {
-        // let _ = delete_processing_files(&processing_path, &filename, &processed_filename);
-
-        let err_str = "Failed to apply audio filter".to_string();
-        error!(
-            "{} for file {}, error_code = {}",
-            err_str,
-            &filename,
-            filter_output.status.code().expect("no exit code")
-        );
-        return send_error(ctx, err_str).await;
+        let _ = delete_processing_files(&processing_path, &filename, &processed_filename);
+        let why = filter_output.status.code().expect("no exit code");
+        let err_str = format!("Failed to apply audio filter for file {}", &filename);
+        return send_error(ctx, err_str, why.to_string()).await;
     }
 
     let name_path = format!("{}{}", &indexed_path, &name);
@@ -272,8 +259,7 @@ pub async fn add_new_file(
         Ok(db) => db,
         Err(why) => {
             let err_str = "Failed to open database".to_string();
-            error!("{}: {}", err_str, why);
-            return send_error(ctx, err_str).await;
+            return send_error(ctx, err_str, why.to_string()).await;
         }
     };
 
@@ -284,9 +270,9 @@ pub async fn add_new_file(
         params![&name, *user_id as i64, announcement_name],
     );
     if insert_res.is_err() {
-            let err_str = "Failed to insert new name".to_string();
-            error!("{}: {}", err_str, insert_res.err().unwrap());
-            return send_error(ctx, err_str).await;
+        let why = insert_res.err().unwrap();
+        let err_str = "Failed to insert new name".to_string();
+        return send_error(ctx, err_str, why.to_string()).await;
     };
 
     let _ = match fs::rename(
@@ -296,9 +282,8 @@ pub async fn add_new_file(
         Ok(res) => res,
         Err(why) => {
             let _ = delete_processing_files(&processing_path, &filename, &processed_filename);
-            let err_str = "Failed to rename file".to_string();
-            error!("{} for file {}: {}", err_str, &processed_filename, why);
-            return send_error(ctx, err_str).await;
+            let err_str = format!("Failed to rename file {}", &processed_filename);
+            return send_error(ctx, err_str, why.to_string()).await;
         }
     };
 
