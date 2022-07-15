@@ -246,6 +246,7 @@ async fn main() {
                 set(),
                 list(),
                 new(),
+                random(),
             ],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("!".into()),
