@@ -1,5 +1,4 @@
-use rusqlite::{params, Connection, OptionalExtension};
-use std::{ffi::OsStr, fs, path::Path, time::Duration};
+use std::{fs, path::Path, time::Duration};
 use tracing::debug;
 
 use poise::futures_util::StreamExt;
@@ -11,7 +10,7 @@ use serenity::{
 
 use crate::{
     lib::{
-        component_ids::{LIST_NEXT_BUTTON, LIST_PREV_BUTTON},
+        component_ids::{NAMES_LIST_NEXT_BUTTON, NAMES_LIST_PREV_BUTTON},
         util::{send_debug, send_error},
     },
     PContext, PError,
@@ -21,7 +20,7 @@ const TIMEOUT_DURATION: Duration = Duration::from_secs(300);
 const EMBED_DESCRIPTION_MAX_LENGTH: usize = 4096;
 const ELEMENTS_PER_PAGE: usize = 10;
 
-#[doc = "List all available announcements for a name."]
+#[doc = "List all names that have available announcements."]
 #[poise::command(
     category = "Main Commands",
     guild_only,
@@ -29,53 +28,19 @@ const ELEMENTS_PER_PAGE: usize = 10;
     slash_command,
     required_bot_permissions = "SEND_MESSAGES"
 )]
-pub async fn list(
+pub async fn names(
     ctx: PContext<'_>,
-    #[description = "The name for which to list announcements."] name: Option<String>,
     #[description = "The page index."]
     #[min = 1]
     index: Option<usize>,
 ) -> Result<(), PError> {
-    let name = match name {
-        Some(name) => name,
-        None => {
-            if let Some(member) = ctx.author_member().await {
-                member.display_name().into_owned()
-            } else {
-                ctx.author().name.clone()
-            }
-        }
-    };
     let mut index = index.unwrap_or(1);
 
-    let path_string = format!("/config/index/{}", &name);
+    let path_string = format!("/config/index/");
     let path = Path::new(&path_string);
 
-    let db_path = Path::new("/config/database/db.sqlite");
-
-    let db = match Connection::open(&db_path) {
-        Ok(db) => db,
-        Err(why) => {
-            let err_str = "Failed to open database:".to_string();
-            return send_error(ctx, err_str, why.to_string()).await;
-        }
-    };
-
-    let filename_res = db
-        .query_row::<String, _, _>("SELECT active_file FROM names WHERE name=?1", params![&name], |row| {
-            row.get(0)
-        })
-        .optional();
-
-    if filename_res.is_err() {
-        let why = filename_res.err().unwrap();
-        let err_str = format!("Failed to query active file for {}", name);
-        return send_error(ctx, err_str, why.to_string()).await;
-    }
-    let filename = filename_res.unwrap();
-
     if path.is_dir() {
-        let (content, last_page_index) = match create_list(ctx, path, &path_string, &filename, index).await {
+        let (content, last_page_index) = match create_list(ctx, path, &path_string, index).await {
             Ok(res) => res,
             Err(why) => return Err(why),
         };
@@ -83,7 +48,7 @@ pub async fn list(
         let message = ctx
             .send(|m| {
                 m.embed(|e| {
-                    e.title(format!("Announcements for \"{}\"", &name))
+                    e.title(format!("List of all names that have announcements"))
                         .description(content)
                         .colour(Colour::from_rgb(128, 128, 128))
                         .footer(|footer| footer.text(format!("Page {}/{}", index, last_page_index)))
@@ -107,10 +72,10 @@ pub async fn list(
             .build();
         while let Some(interaction) = collector.next().await {
             match interaction.data.custom_id.as_str() {
-                LIST_PREV_BUTTON => {
+                NAMES_LIST_PREV_BUTTON => {
                     index -= 1;
                 }
-                LIST_NEXT_BUTTON => {
+                NAMES_LIST_NEXT_BUTTON => {
                     index += 1;
                 }
                 _ => {
@@ -119,7 +84,7 @@ pub async fn list(
                     return send_debug(ctx, err_str, why.to_string()).await;
                 }
             }
-            let (content, last_page_index) = match create_list(ctx, path, &path_string, &filename, index).await {
+            let (content, last_page_index) = match create_list(ctx, path, &path_string, index).await {
                 Ok(res) => res,
                 Err(why) => return Err(why),
             };
@@ -129,7 +94,7 @@ pub async fn list(
                         .kind(InteractionResponseType::UpdateMessage)
                         .interaction_response_data(|m| {
                             m.embed(|e| {
-                                e.title(format!("Announcements for \"{}\"", &name))
+                                e.title(format!("List of all names that have announcements"))
                                     .description(content)
                                     .colour(Colour::from_rgb(128, 128, 128))
                                     .footer(|footer| footer.text(format!("Page {}/{}", index, last_page_index)))
@@ -154,8 +119,8 @@ pub async fn list(
         let _ = message.delete(&ctx.discord().http).await;
         return Ok(());
     } else {
-        let why = name;
-        let err_str = "This name doesn't exist".to_string();
+        let why = path_string;
+        let err_str = "Index directory doesn't exist".to_string();
         return send_debug(ctx, err_str, why.to_string()).await;
     }
 }
@@ -164,7 +129,6 @@ async fn create_list(
     ctx: PContext<'_>,
     path: &Path,
     path_string: &String,
-    filename: &Option<String>,
     index: usize,
 ) -> Result<(String, usize), PError> {
     let mut dir_iterator = match fs::read_dir(path) {
@@ -199,13 +163,6 @@ async fn create_list(
         };
     }
 
-    let mut active_filename = None;
-    let active_filename_str;
-    if filename.is_some() {
-        active_filename_str = filename.as_ref().unwrap();
-        active_filename = Some(OsStr::new(active_filename_str));
-    }
-
     let mut msg_len = 0;
     let mut msg_str = "".to_string();
     let mut count = 0;
@@ -226,17 +183,11 @@ async fn create_list(
                 };
             }
         };
-        let mut line_str = "".to_owned();
-        if !entry_value.path().is_dir() {
-            if active_filename.is_some() && entry_value.path().file_stem().unwrap() == active_filename.unwrap() {
-                line_str = format!(
-                    "• `{}` <=={:=>30}",
-                    entry_value.path().file_stem().unwrap().to_str().unwrap(),
-                    format!(" {}", &ctx.author().mention())
-                );
-            } else {
-                line_str = format!("• `{}`", entry_value.path().file_stem().unwrap().to_str().unwrap());
-            }
+        let line_str;
+        if entry_value.path().is_dir() {
+            line_str = format!("• `{}`", entry_value.path().file_stem().unwrap().to_str().unwrap());
+        } else {
+            continue;
         }
 
         let line_len = line_str.chars().count();
@@ -265,7 +216,7 @@ fn create_components(components: &mut CreateComponents, prev: bool, next: bool) 
     components.create_action_row(|r| {
         r.create_button(|button| {
             button
-                .custom_id(LIST_PREV_BUTTON)
+                .custom_id(NAMES_LIST_PREV_BUTTON)
                 .label("Previous")
                 .style(ButtonStyle::Secondary);
 
@@ -276,7 +227,7 @@ fn create_components(components: &mut CreateComponents, prev: bool, next: bool) 
         })
         .create_button(|button| {
             button
-                .custom_id(LIST_NEXT_BUTTON)
+                .custom_id(NAMES_LIST_NEXT_BUTTON)
                 .label("Next")
                 .style(ButtonStyle::Secondary);
 

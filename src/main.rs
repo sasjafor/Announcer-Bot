@@ -29,7 +29,7 @@ use serenity::{
 use rusqlite::{params, Connection};
 use tracing::{debug, error, info};
 
-use commands::{list::*, new::*, random::*, set::*};
+use commands::{list::*, new::*, random::*, set::*, names::*};
 
 use lib::check::can_connect;
 
@@ -247,6 +247,7 @@ async fn main() {
                 list(),
                 new(),
                 random(),
+                names(),
             ],
             prefix_options: poise::PrefixFrameworkOptions {
                 prefix: Some("!".into()),

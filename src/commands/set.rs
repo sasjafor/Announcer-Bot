@@ -70,10 +70,12 @@ pub async fn set(
 
         let message = ctx
             .send(|m| {
-                m.content("Choose an announcement").components(|c| {
-                    create_dropdown(c, false, over_limit, options);
-                    c
-                })
+                m.content("Choose an announcement");
+                    m.components(|c| {
+                        create_dropdown(c, false, over_limit, options);
+                        c
+                    });
+                m
             })
             .await?
             .message()
@@ -278,21 +280,23 @@ fn create_dropdown(
                     .max_values(1)
                     .options(|c| c.set_options(options))
             })
-        })
-        .create_action_row(|r| {
-            r.create_button(|b| {
-                b.custom_id(ANNOUNCEMENT_SELECTOR_PREV_BUTTON).label("Prev");
-                if !prev {
-                    b.disabled(true);
-                }
-                b
-            })
-            .create_button(|b| {
-                b.custom_id(ANNOUNCEMENT_SELECTOR_NEXT_BUTTON).label("Next");
-                if !next {
-                    b.disabled(true);
-                }
-                b
-            })
         });
+        if prev || next {
+            components.create_action_row(|r| {
+                r.create_button(|b| {
+                    b.custom_id(ANNOUNCEMENT_SELECTOR_PREV_BUTTON).label("Prev");
+                    if !prev {
+                        b.disabled(true);
+                    }
+                    b
+                })
+                .create_button(|b| {
+                    b.custom_id(ANNOUNCEMENT_SELECTOR_NEXT_BUTTON).label("Next");
+                    if !next {
+                        b.disabled(true);
+                    }
+                    b
+                })
+            });
+    };
 }
