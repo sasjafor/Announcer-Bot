@@ -8,7 +8,7 @@ use serenity::{model::prelude::*, utils::Colour};
 use crate::{
     lib::{
         parse::parse_duration,
-        util::{send_debug, send_error, send_warning}, consts::ELEMENT_LABEL_LENGTH,
+        util::{send_debug, send_error}, consts::ELEMENT_LABEL_LENGTH,
     },
     PContext, PError,
 };
@@ -149,7 +149,7 @@ pub async fn url(
         return send_debug(ctx, err_str, why.to_string()).await;
     }
 
-    let youtube_url = Command::new("youtube-dl")
+    let youtube_url = Command::new("yt-dlp")
         .arg("-g")
         .arg(&url)
         .output()

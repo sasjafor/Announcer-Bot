@@ -52,8 +52,8 @@ COPY --from=builder /announcer_bot/target/release/announcer_bot /bin
 WORKDIR /
 
 # Install youtube-dl
-ADD https://yt-dl.org/downloads/latest/youtube-dl /usr/local/bin/
-RUN chmod a+rx /usr/local/bin/youtube-dl
+ADD https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp /usr/local/bin/
+RUN chmod a+rx /usr/local/bin/yt-dlp
 
 # Set run command
 VOLUME /config
