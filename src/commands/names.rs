@@ -11,7 +11,7 @@ use serenity::{
 use crate::{
     lib::{
         component_ids::{NAMES_LIST_NEXT_BUTTON, NAMES_LIST_PREV_BUTTON},
-        util::{send_debug, send_error}, consts::EMBED_DESCRIPTION_MAX_LENGTH,
+        util::{send_debug, send_error, send_warning}, consts::EMBED_DESCRIPTION_MAX_LENGTH,
     },
     PContext, PError,
 };
@@ -80,7 +80,7 @@ pub async fn names(
                 _ => {
                     let why = &interaction.data.custom_id;
                     let err_str = "Unknown component interaction".to_string();
-                    return send_debug(ctx, err_str, why.to_string()).await;
+                    return send_warning(ctx, err_str, why.to_string()).await;
                 }
             }
             let (content, last_page_index) = match create_list(ctx, path, &path_string, index).await {
@@ -120,7 +120,7 @@ pub async fn names(
     } else {
         let why = path_string;
         let err_str = "Index directory doesn't exist".to_string();
-        return send_debug(ctx, err_str, why.to_string()).await;
+        return send_warning(ctx, err_str, why.to_string()).await;
     }
 }
 
@@ -197,7 +197,7 @@ async fn create_list(
         if msg_len + line_len > EMBED_DESCRIPTION_MAX_LENGTH {
             let why = msg_len + line_len;
             let err_str = "Embed too long".to_string();
-            return match send_debug(ctx, err_str, why.to_string()).await {
+            return match send_warning(ctx, err_str, why.to_string()).await {
                 Ok(_) => Err(Into::into("Err")),
                 Err(why) => Err(why),
             };

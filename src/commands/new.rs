@@ -64,8 +64,8 @@ pub async fn file(
     let announcement_length = announcement.chars().count();
     if announcement_length > ELEMENT_LABEL_LENGTH {
         let why = announcement_length;
-        let err_str = "Error creating file".to_string();
-        return send_warning(ctx, err_str, why.to_string()).await;
+        let err_str = "Announcement name is too long".to_string();
+        return send_debug(ctx, err_str, why.to_string()).await;
     }
 
     let discord_name = match ctx.guild_id() {
@@ -135,7 +135,7 @@ pub async fn url(
         Ok(url) => url,
         Err(why) => {
             let err_str = "Please provide a valid url".to_string();
-            return send_error(ctx, err_str, why.to_string()).await;
+            return send_debug(ctx, err_str, why.to_string()).await;
         }
     };
 

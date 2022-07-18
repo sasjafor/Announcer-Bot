@@ -122,7 +122,7 @@ pub async fn set(
                 _ => {
                     let why = &interaction.data.custom_id;
                     let err_str = "Unknown component interaction".to_string();
-                    return send_error(ctx, err_str, why.to_string()).await;
+                    return send_warning(ctx, err_str, why.to_string()).await;
                 }
             }
 
