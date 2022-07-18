@@ -12,14 +12,12 @@ use serenity::{
 use crate::{
     lib::{
         component_ids::*,
-        util::{send_debug, send_error, send_warning},
+        util::{send_debug, send_error, send_warning}, consts::{ELEMENTS_PER_MENU, ELEMENT_LABEL_LENGTH},
     },
     PContext, PError,
 };
 
 const TIMEOUT_DURATION: Duration = Duration::from_secs(300);
-const ELEMENTS_PER_MENU: usize = 25;
-const ELEMENT_LABEL_LENGTH: usize = 100;
 
 #[doc = "Set the active announcement for the current nickname."]
 #[poise::command(

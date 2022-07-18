@@ -11,13 +11,12 @@ use serenity::{
 use crate::{
     lib::{
         component_ids::{NAMES_LIST_NEXT_BUTTON, NAMES_LIST_PREV_BUTTON},
-        util::{send_debug, send_error},
+        util::{send_debug, send_error}, consts::EMBED_DESCRIPTION_MAX_LENGTH,
     },
     PContext, PError,
 };
 
 const TIMEOUT_DURATION: Duration = Duration::from_secs(300);
-const EMBED_DESCRIPTION_MAX_LENGTH: usize = 4096;
 const ELEMENTS_PER_PAGE: usize = 10;
 
 #[doc = "List all names that have available announcements."]
