@@ -8,7 +8,7 @@ use serenity::{model::prelude::*, utils::Colour};
 use crate::{
     lib::{
         parse::parse_duration,
-        util::{send_debug, send_error},
+        util::{send_debug, send_error, send_warning}, consts::ELEMENT_LABEL_LENGTH,
     },
     PContext, PError,
 };
@@ -61,6 +61,13 @@ pub async fn file(
     #[description = "Audio file to be used as announcement."] file: Attachment,
     #[description = "FFMPEG filters to transform audio."] filters: Option<String>,
 ) -> Result<(), PError> {
+    let announcement_length = announcement.chars().count();
+    if announcement_length > ELEMENT_LABEL_LENGTH {
+        let why = announcement_length;
+        let err_str = "Error creating file".to_string();
+        return send_warning(ctx, err_str, why.to_string()).await;
+    }
+
     let discord_name = match ctx.guild_id() {
         Some(guild_id) => match user.nick_in(&ctx.discord().http, guild_id).await {
             Some(nick) => nick,
