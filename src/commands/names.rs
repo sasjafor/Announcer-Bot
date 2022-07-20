@@ -4,14 +4,20 @@ use tracing::debug;
 use poise::futures_util::StreamExt;
 use serenity::{
     builder::CreateComponents,
-    model::{interactions::message_component::ButtonStyle, prelude::*},
+    model::{
+        application::{
+            component::ButtonStyle,
+            interaction::InteractionResponseType, 
+        }
+    },
     utils::Colour,
 };
 
 use crate::{
     lib::{
         component_ids::{NAMES_LIST_NEXT_BUTTON, NAMES_LIST_PREV_BUTTON},
-        util::{send_debug, send_error, send_warning}, consts::EMBED_DESCRIPTION_MAX_LENGTH,
+        consts::EMBED_DESCRIPTION_MAX_LENGTH,
+        util::{send_debug, send_error, send_warning},
     },
     PContext, PError,
 };

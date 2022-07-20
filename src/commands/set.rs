@@ -5,7 +5,10 @@ use tracing::debug;
 use poise::futures_util::StreamExt;
 use serenity::{
     builder::{CreateComponents, CreateSelectMenuOption},
-    model::prelude::*,
+    model::{
+        application::interaction::InteractionResponseType,
+        prelude::*
+    },
     utils::Colour,
 };
 
