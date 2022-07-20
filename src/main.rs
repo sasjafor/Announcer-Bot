@@ -31,7 +31,7 @@ use tracing::{debug, error, info};
 
 use commands::{list::*, new::*, random::*, set::*, names::*};
 
-use lib::check::can_connect;
+use lib::{check::can_connect, util::send_debug};
 
 use crate::lib::util::{announce, play_file, print_type_of, voice_channel_is_empty};
 
@@ -269,6 +269,9 @@ async fn main() {
                     {
                         return Ok(true);
                     } else {
+                        let why = "Channel not in allowed list.";
+                        let err_string = format!("Use a valid channel to send commands");
+                        let _ = send_debug(ctx, err_string, why.to_string()).await;
                         return Ok(false);
                     }
                 })
