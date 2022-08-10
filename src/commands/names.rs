@@ -67,7 +67,7 @@ pub async fn names(
                 m
             })
             .await?
-            .message()
+            .into_message()
             .await
             .unwrap();
 

@@ -79,7 +79,7 @@ pub async fn set(
                 m
             })
             .await?
-            .message()
+            .into_message()
             .await
             .unwrap();
 

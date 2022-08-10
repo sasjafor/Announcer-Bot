@@ -238,7 +238,7 @@ async fn main() {
         | GatewayIntents::GUILD_VOICE_STATES
         | GatewayIntents::GUILDS
         | GatewayIntents::MESSAGE_CONTENT;
-    let framework = poise::Framework::build()
+    let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![
                 help(),

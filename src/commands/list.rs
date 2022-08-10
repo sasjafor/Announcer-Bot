@@ -100,7 +100,7 @@ pub async fn list(
                 m
             })
             .await?
-            .message()
+            .into_message()
             .await
             .unwrap();
 

@@ -40,7 +40,7 @@ See all filters here https://ffmpeg.org/ffmpeg-filters.html
     slash_command,
     required_bot_permissions = "SEND_MESSAGES",
     subcommands("file", "url"),
-    explanation_fn = "new_help"
+    help_text_fn = "new_help"
 )]
 pub async fn new(_ctx: PContext<'_>) -> Result<(), PError> {
     return Ok(());
