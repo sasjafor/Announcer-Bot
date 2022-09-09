@@ -36,8 +36,6 @@ RUN apt-get update && \
                                                 lame \
                                                 libopus0 \
                                                 libsqlite3-dev \
-                                                libssl1.1 \
-                                                libssl-dev \
                                                 python-is-python3 \
                                                 vorbis-tools \
                                                 && \

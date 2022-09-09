@@ -49,7 +49,7 @@ features = [
     "utils",
     "cache",
     "voice",
-    "native_tls_backend",
+    "rustls_backend",
 ]
 version = "0.11.5"
 
