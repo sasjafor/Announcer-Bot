@@ -14,7 +14,7 @@ codegen-units = 1
 log = "0.4.17"
 env_logger = "0.9.0"
 libsodium-sys = "0.2.7"
-url = "2.2.2"
+url = "2.3.1"
 regex = "1.6.0"
 lazy_static = "1.4.0"
 rusqlite = "0.28.0"
@@ -35,7 +35,7 @@ version = "0.3.0"
 # branch = "next"
 
 [dependencies.tokio]
-version = "1.20.1"
+version = "1.21.0"
 features = ["macros", "signal", "rt-multi-thread"]
 
 [dependencies.serenity]
