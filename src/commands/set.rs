@@ -40,7 +40,7 @@ pub async fn set(
         None => ctx.author().clone(),
     };
     let discord_name = match ctx.guild_id() {
-        Some(guild_id) => match discord_user.nick_in(&ctx.discord().http, guild_id).await {
+        Some(guild_id) => match discord_user.nick_in(&ctx, guild_id).await {
             Some(nick) => nick,
             None => discord_user.name.clone(),
         },
@@ -84,7 +84,7 @@ pub async fn set(
             .unwrap();
 
         let mut collector = message
-            .await_component_interactions(ctx.discord())
+            .await_component_interactions(ctx)
             .timeout(TIMEOUT_DURATION)
             .build();
         while let Some(interaction) = collector.next().await {
@@ -93,7 +93,7 @@ pub async fn set(
                     let announcement_name = interaction.data.values.first().unwrap().to_owned();
                     return match set_fn(ctx, &announcement_name, &discord_user, &discord_name).await {
                         Ok(_) => interaction
-                            .create_interaction_response(&ctx.discord().http, |response| {
+                            .create_interaction_response(&ctx, |response| {
                                 response
                                     .kind(InteractionResponseType::UpdateMessage)
                                     .interaction_response_data(|m| {
@@ -134,7 +134,7 @@ pub async fn set(
                 Err(why) => return Err(why),
             };
             if let Err(why) = interaction
-                .create_interaction_response(&ctx.discord().http, |response| {
+                .create_interaction_response(&ctx, |response| {
                     response
                         .kind(InteractionResponseType::UpdateMessage)
                         .interaction_response_data(|m| {
@@ -152,7 +152,7 @@ pub async fn set(
 
         let err_str = "Timeout".to_string();
         debug!("{}", err_str);
-        let _ = message.delete(&ctx.discord().http).await;
+        let _ = message.delete(&ctx).await;
         return Ok(());
     }
 }

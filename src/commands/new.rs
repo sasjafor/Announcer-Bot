@@ -69,7 +69,7 @@ pub async fn file(
     }
 
     let discord_name = match ctx.guild_id() {
-        Some(guild_id) => match user.nick_in(&ctx.discord().http, guild_id).await {
+        Some(guild_id) => match user.nick_in(&ctx, guild_id).await {
             Some(nick) => nick,
             None => user.name.clone(),
         },
@@ -121,7 +121,7 @@ pub async fn url(
     #[description = "FFMPEG filters to transform audio."] filters: Option<String>,
 ) -> Result<(), PError> {
     let discord_name = match ctx.guild_id() {
-        Some(guild_id) => match user.nick_in(&ctx.discord().http, guild_id).await {
+        Some(guild_id) => match user.nick_in(&ctx, guild_id).await {
             Some(nick) => nick,
             None => user.name.clone(),
         },

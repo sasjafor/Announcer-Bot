@@ -72,7 +72,7 @@ pub async fn names(
             .unwrap();
 
         let mut collector = message
-            .await_component_interactions(ctx.discord())
+            .await_component_interactions(ctx)
             .timeout(TIMEOUT_DURATION)
             .build();
         while let Some(interaction) = collector.next().await {
@@ -94,7 +94,7 @@ pub async fn names(
                 Err(why) => return Err(why),
             };
             if let Err(why) = interaction
-                .create_interaction_response(&ctx.discord().http, |response| {
+                .create_interaction_response(&ctx, |response| {
                     response
                         .kind(InteractionResponseType::UpdateMessage)
                         .interaction_response_data(|m| {
@@ -121,7 +121,7 @@ pub async fn names(
 
         let err_str = "Timeout".to_string();
         debug!("{}", err_str);
-        let _ = message.delete(&ctx.discord().http).await;
+        let _ = message.delete(&ctx).await;
         return Ok(());
     } else {
         let why = path_string;

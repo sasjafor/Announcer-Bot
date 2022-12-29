@@ -289,7 +289,7 @@ async fn main() {
         })
         .token(token)
         .intents(intents)
-        .user_data_setup(move |_ctx, _ready, _framework| Box::pin(async move { Ok(Data {}) }))
+        .setup(move |_ctx, _ready, _framework| Box::pin(async move { Ok(Data {}) }))
         .client_settings(move |f| f.register_songbird().event_handler(Handler));
 
     let audio = Path::new("/config/audio");
