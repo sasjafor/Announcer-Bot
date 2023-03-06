@@ -13,7 +13,7 @@ use serenity::{
 };
 
 use crate::{
-    lib::{
+    util::{
         component_ids::*,
         util::{send_debug, send_error, send_warning}, consts::{ELEMENTS_PER_MENU, ELEMENT_LABEL_LENGTH},
     },

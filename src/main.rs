@@ -1,5 +1,5 @@
 mod commands;
-mod lib;
+mod util;
 
 use std::{
     env,
@@ -31,9 +31,9 @@ use tracing::{debug, error, info};
 
 use commands::{list::*, new::*, random::*, set::*, names::*};
 
-use lib::{check::can_connect, util::send_debug};
+use util::{check::can_connect, util::send_debug};
 
-use crate::lib::util::{announce, play_file, print_type_of, voice_channel_is_empty};
+use crate::util::util::{announce, play_file, print_type_of, voice_channel_is_empty};
 
 // Types used by all command functions
 type PError = Box<dyn std::error::Error + Send + Sync>;

@@ -14,7 +14,7 @@ use serenity::{
 };
 
 use crate::{
-    lib::{
+    util::{
         component_ids::{NAMES_LIST_NEXT_BUTTON, NAMES_LIST_PREV_BUTTON},
         consts::EMBED_DESCRIPTION_MAX_LENGTH,
         util::{send_debug, send_error, send_warning},

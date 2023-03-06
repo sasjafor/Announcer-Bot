@@ -3,7 +3,7 @@ use std::path::Path;
 
 use serenity::{model::prelude::*, utils::Colour};
 
-use crate::{lib::util::{send_error, send_debug}, PContext, PError};
+use crate::{util::util::{send_error, send_debug}, PContext, PError};
 
 #[doc = "Toggle randomised mode."]
 #[poise::command(

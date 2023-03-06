@@ -6,7 +6,7 @@ use url::Url;
 use serenity::{model::prelude::*, utils::Colour};
 
 use crate::{
-    lib::{
+    util::{
         parse::parse_duration,
         util::{send_debug, send_error}, consts::ELEMENT_LABEL_LENGTH,
     },
