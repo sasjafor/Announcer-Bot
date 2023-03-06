@@ -1,7 +1,9 @@
 
 
 # Announcer Bot
-[![Build Status](https://img.shields.io/github/workflow/status/sasjafor/Announcer-Bot/Docker%20Image%20CI?style=flat-square)](https://github.com/sasjafor/Announcer-Bot/actions/workflows/docker-image-ci.yml) [![License](https://img.shields.io/badge/license-GPL-lightgrey.svg?style=flat-square)](https://opensource.org/licenses/gpl-license) [![Discord Server](https://img.shields.io/discord/518113399448666113.svg?style=flat-square&colorB=7289DA)](https://discord.gg/qPxJfWw)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/sasjafor/Announcer-Bot/docker-image-ci.yml?branch=master&style=flat-square)](https://github.com/sasjafor/Announcer-Bot/actions/workflows/docker-image-ci.yml) 
+[![License](https://img.shields.io/badge/license-GPL-lightgrey.svg?style=flat-square)](https://opensource.org/licenses/gpl-license) 
+[![Discord Server](https://img.shields.io/discord/518113399448666113.svg?style=flat-square&colorB=7289DA)](https://discord.gg/qPxJfWw)
 
 A simple Discord bot that announces users joining a voice channel or unmuting themselves.
 
