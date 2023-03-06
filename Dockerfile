@@ -1,4 +1,4 @@
-FROM rust:1.63 as builder
+FROM rust:1.67 as builder
 
 # Create empty shell project
 RUN USER=root cargo new --bin announcer_bot
