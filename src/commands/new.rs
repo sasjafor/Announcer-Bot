@@ -1,6 +1,6 @@
 use poise::CreateReply;
 use rusqlite::{params, Connection};
-use std::{fs, fs::File, io::prelude::*, path::Path, process::Command, time::Duration};
+use std::{fs::{self, File}, io::prelude::*, path::Path, process::Command, time::Duration};
 use tracing::debug;
 use url::Url;
 
@@ -154,6 +154,7 @@ pub async fn url(
     }
 
     let youtube_url = Command::new("yt-dlp")
+        .arg("--no-playlist")
         .arg("-g")
         .arg(&url)
         .output()
@@ -161,8 +162,9 @@ pub async fn url(
 
     if !youtube_url.status.success() {
         let why = youtube_url.status;
-        let err_str = format!("Youtube-dl Error: It likely needs an update, url = {}", &url);
-        return send_error(ctx, err_str, why.to_string()).await;
+        let errors = String::from_utf8(youtube_url.stderr).expect("Invalid error bytes");
+        let err_str = format!("Youtube-dl Error: It likely needs an update, url = {}\n{}\n", &url, &why);
+        return send_error(ctx, err_str, errors).await;
     }
 
     let youtube_dloutput = match String::from_utf8(youtube_url.stdout) {
@@ -326,14 +328,14 @@ fn delete_processing_files(processing_path: &str, filename: &str, processed_file
     let _ = match fs::remove_file(format!("{}{}", &processing_path, &filename)) {
         Ok(res) => res,
         Err(why) => {
-            debug!("Failed to remove queue file {} ERROR: {}", &filename, why);
+            debug!("Failed to remove queue file {}{} ERROR: {}", &processing_path, &filename, why);
         }
     };
 
     let _ = match fs::remove_file(format!("{}{}", &processing_path, &processed_filename)) {
         Ok(res) => res,
         Err(why) => {
-            debug!("Failed to remove queue file {} ERROR: {}", &processed_filename, why);
+            debug!("Failed to remove queue file {}{} ERROR: {}", &processing_path, &processed_filename, why);
         }
     };
 }
