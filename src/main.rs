@@ -89,6 +89,7 @@ impl EventHandler for Handler {
         if !maybe_channel_id.is_some() {
             return;
         }
+        let channel_id = maybe_channel_id.unwrap();
 
         if !(&old_state).is_some() {
             let cant_connect = !can_connect(&ctx, maybe_channel_id.unwrap());
@@ -131,9 +132,8 @@ impl EventHandler for Handler {
             }
         }
 
-        let channel_id = maybe_channel_id.unwrap();
-
-        if !new_state.self_mute {
+        if (!(&old_state).is_some() && !new_state.self_mute) || 
+           (old_state.unwrap().self_mute && !new_state.self_mute) {
             info!("UNMUTE!");
 
             let member = guild_id.member(&ctx.http, user_id).await.unwrap();
