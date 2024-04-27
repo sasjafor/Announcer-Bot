@@ -107,7 +107,7 @@ impl EventHandler for Handler {
                     let guild = guild_id.to_guild_cached(&ctx).unwrap();
                     user_check = match guild.voice_states.get(&USER2_ID) {
                         Some(user_check) => user_check.channel_id == Some(channel_id),
-                        None => return
+                        None => false
                     };
                 }
 
@@ -122,7 +122,7 @@ impl EventHandler for Handler {
                     let guild = guild_id.to_guild_cached(&ctx).unwrap();
                     user_check = match guild.voice_states.get(&USER1_ID) {
                         Some(user_check) => user_check.channel_id == Some(channel_id),
-                        None => return
+                        None => false
                     };
                 }
 
