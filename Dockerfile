@@ -1,4 +1,4 @@
-FROM rust:1.72 as builder
+FROM rust:1.77 as builder
 
 # Create empty shell project
 RUN USER=root cargo new --bin announcer_bot
@@ -10,7 +10,7 @@ COPY ./Cargo.toml ./Cargo.toml
 
 # Install cmake
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends cmake
+    apt-get install -y --no-install-recommends cmake libopus-dev
 
 # Build dependencies
 RUN RUSTFLAGS='-C link-arg=-s' cargo build --release
@@ -35,6 +35,7 @@ RUN apt-get update && \
                                                 ffmpeg \
                                                 lame \
                                                 libopus0 \
+                                                libopus-dev \
                                                 libsqlite3-dev \
                                                 python-is-python3 \
                                                 vorbis-tools \
