@@ -80,7 +80,7 @@ pub async fn file(
         None => user.name.clone(),
     };
 
-    let filename = format!("{}.wav", &announcement);
+    let filename = format!("{}.flac", &announcement);
     let processing_path = "/config/processing/";
 
     let content = match file.download().await {
@@ -132,7 +132,7 @@ pub async fn url(
         None => user.name.clone(),
     };
 
-    let filename = format!("{}.wav", &announcement);
+    let filename = format!("{}.flac", &announcement);
     let processing_path = "/config/processing/";
 
     let _ = match Url::parse(&url) {
@@ -195,7 +195,7 @@ pub async fn url(
         .arg(audio_url)
         .arg("-vn")
         .arg("-f")
-        .arg("wav")
+        .arg("flac")
         .arg(format!("file:{}", &filename))
         .current_dir(&processing_path)
         .output()
@@ -218,8 +218,8 @@ pub async fn add_new_file(
     user: &User,
     filters: Option<&String>,
 ) -> Result<(), PError> {
-    let filename = format!("{}.wav", &announcement_name);
-    let processed_filename = format!("{}{}", &announcement_name, ".processed.wav");
+    let filename = format!("{}.flac", &announcement_name);
+    let processed_filename = format!("{}{}", &announcement_name, ".processed.flac");
     let processing_path = "/config/processing/";
     let indexed_path = "/config/index/";
     let db_path = Path::new("/config/database/db.sqlite");
@@ -242,14 +242,14 @@ pub async fn add_new_file(
         .arg("-ar")
         .arg("48000")
         .arg("-f")
-        .arg("wav")
+        .arg("flac")
         .arg(format!("file:{}", &processed_filename))
         .current_dir(&processing_path)
         .output()
         .expect("Failed to run ffmpeg");
 
     debug!(
-        "ffmpeg -y -t 00:00:06 -i {} -filter:a {} -ar 48000 -f wav {}",
+        "ffmpeg -y -t 00:00:06 -i {} -filter:a {} -ar 48000 -f flac {}",
         format!("file:{}", &filename),
         &normalize_and_filter_string,
         format!("file:{}", &processed_filename)
@@ -292,7 +292,7 @@ pub async fn add_new_file(
 
     let _ = match fs::rename(
         format!("{}{}", &processing_path, &processed_filename),
-        format!("{}{}/{}.wav", &indexed_path, &name, announcement_name),
+        format!("{}{}/{}.flac", &indexed_path, &name, announcement_name),
     ) {
         Ok(res) => res,
         Err(why) => {

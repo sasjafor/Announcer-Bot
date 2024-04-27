@@ -67,10 +67,10 @@ pub async fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, n
             let mut paths = read_dir(&index_base_path).unwrap();
             path = paths.nth(index).unwrap().unwrap().path().to_str().unwrap().to_owned();
         } else {
-            path = format!("{}/{}.wav", &index_base_path, &filename.unwrap());
+            path = format!("{}/{}.flac", &index_base_path, &filename.unwrap());
         }
     } else {
-        path = format!("/config/audio/{}.wav", &name);
+        path = format!("/config/audio/{}.flac", &name);
     }
 
     check_path(&path, &name);
@@ -86,11 +86,11 @@ pub async fn play_file(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, 
 
     let handler_lock = match manager.join(guild_id, channel_id).await {
         Ok(handler_lock) => handler_lock,
-            Err(err) => {
-                error!("Failed to connect to channel with id {} with err {}", channel_id, err);
-                return;
-            }
-        };
+        Err(err) => {
+            error!("Failed to connect to channel with id {} with err {}", channel_id, err);
+            return;
+        }
+    };
 
     let mut handler = handler_lock.lock().await;
 

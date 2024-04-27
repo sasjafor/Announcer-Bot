@@ -174,12 +174,12 @@ async fn set_fn(
     discord_user: &User,
     discord_name: &String,
 ) -> Result<(), PError> {
-    let path_string = format!("/config/index/{}/{}.wav", discord_name, announcement_name);
+    let path_string = format!("/config/index/{}/{}.flac", discord_name, announcement_name);
     let path = Path::new(&path_string);
 
     if !path.exists() {
         let why = "File doesn't exist.";
-        let err_str = "Please choose a valid announcement".to_string();
+        let err_str = format!("Please choose a valid announcement. Path={}", &path_string);
         return send_debug(ctx, err_str, why.to_string()).await;
     }
 

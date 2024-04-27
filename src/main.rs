@@ -100,7 +100,7 @@ impl EventHandler for Handler {
 
             let channel_id = maybe_channel_id.unwrap();
 
-            let path = "/config/StGallerConnection.mp3";
+            let path = "/config/StGallerConnection.flac";
             if user_id == USER1_ID {
                 let user_check;
                 {
