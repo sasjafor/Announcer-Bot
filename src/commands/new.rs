@@ -1,9 +1,13 @@
+use poise::CreateReply;
 use rusqlite::{params, Connection};
 use std::{fs, fs::File, io::prelude::*, path::Path, process::Command, time::Duration};
 use tracing::debug;
 use url::Url;
 
-use serenity::{model::prelude::*, utils::Colour};
+use serenity::{all::CreateEmbed, model::{
+        colour::Colour,
+        prelude::*,
+    }};
 
 use crate::{
     util::{
@@ -270,11 +274,11 @@ pub async fn add_new_file(
         }
     };
 
-    let user_id = user.id.as_u64();
+    let user_id = user.id.get();
     let insert_res = db.execute(
         "INSERT OR REPLACE INTO names (name, user_id, active_file)
             VALUES (?1, ?2, ?3)",
-        params![&name, *user_id as i64, announcement_name],
+        params![&name, user_id as i64, announcement_name],
     );
     if insert_res.is_err() {
         let why = insert_res.err().unwrap();
@@ -305,16 +309,17 @@ pub async fn add_new_file(
 
     let _ = delete_processing_files(&processing_path, &filename, &processed_filename);
 
-    ctx.send(|m| {
-        m.embed(|e| {
-            e.title(format!("Successfully added new file for {}", name))
-                .description(format!("`{}` [{}]", &announcement_name, &user.mention()))
-                .colour(Colour::from_rgb(128, 128, 128))
-        })
-    })
-    .await
-    .map(drop)
-    .map_err(Into::into)
+    let reply = CreateReply::default()
+        .embed(CreateEmbed::new()
+            .title(format!("Successfully added new file for {}", name))
+            .description(format!("`{}` [{}]", &announcement_name, &user.mention()))
+            .colour(Colour::from_rgb(128, 128, 128))
+        );
+
+    ctx.send(reply)
+        .await
+        .map(drop)
+        .map_err(Into::into)
 }
 
 fn delete_processing_files(processing_path: &str, filename: &str, processed_filename: &str) {

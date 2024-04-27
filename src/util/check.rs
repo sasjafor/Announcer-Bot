@@ -1,18 +1,14 @@
 use serenity::{
-    client::{
-        Context,
-    },
+    client::Context,
     model::{
-        id::{
-            ChannelId,
-        }, 
+        id::ChannelId, 
         prelude::*,
     },
 };
 
 /// Checks if user can connect to a voice channel
-pub async fn can_connect(ctx: &Context, channel_id: ChannelId) -> bool {
-    let channel = match ctx.cache.guild_channel(channel_id) {
+pub fn can_connect(ctx: &Context, channel_id: ChannelId) -> bool {
+    let channel = match ctx.cache.channel(channel_id) {
         Some(channel) => channel,
         None => return false,
     };

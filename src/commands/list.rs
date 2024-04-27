@@ -2,21 +2,22 @@ use rusqlite::{params, Connection, OptionalExtension};
 use std::{ffi::OsStr, fs, path::Path, time::Duration};
 use tracing::debug;
 
-use poise::futures_util::StreamExt;
+use poise::{futures_util::StreamExt, CreateReply};
 use serenity::{
-    builder::CreateComponents,
+    all::{
+        CreateEmbed, 
+        CreateEmbedFooter, 
+        CreateInteractionResponse,
+        CreateInteractionResponseMessage},
     model::{
-        application::{component::ButtonStyle, interaction::InteractionResponseType},
+        colour::Colour,
         prelude::*,
     },
-    utils::Colour,
 };
 
 use crate::{
     util::{
-        component_ids::{LIST_NEXT_BUTTON, LIST_PREV_BUTTON},
-        consts::EMBED_DESCRIPTION_MAX_LENGTH,
-        util::{send_debug, send_error, send_warning},
+        component_ids::{LIST_NEXT_BUTTON, LIST_PREV_BUTTON}, consts::EMBED_DESCRIPTION_MAX_LENGTH, messages::create_navigation_buttons, util::{send_debug, send_error, send_warning}
     },
     PContext, PError,
 };
@@ -43,7 +44,7 @@ pub async fn list(
         Some(name) => name,
         None => {
             if let Some(member) = ctx.author_member().await {
-                member.display_name().into_owned()
+                member.display_name().to_owned()
             } else {
                 ctx.author().name.clone()
             }
@@ -83,22 +84,22 @@ pub async fn list(
             Err(why) => return Err(why),
         };
 
+        let mut components = vec![];
+        if last_page_index > 1 {
+            components = create_navigation_buttons(index != 1, index < last_page_index);
+        }
+
+        let reply = CreateReply::default()
+            .embed(CreateEmbed::new()
+                .title(format!("Announcements for \"{}\"", &name))
+                .description(content)
+                .colour(Colour::from_rgb(128, 128, 128))
+                .footer(CreateEmbedFooter::new(format!("Page {}/{}", index, last_page_index)))
+            )
+            .components(components);
+
         let message = ctx
-            .send(|m| {
-                m.embed(|e| {
-                    e.title(format!("Announcements for \"{}\"", &name))
-                        .description(content)
-                        .colour(Colour::from_rgb(128, 128, 128))
-                        .footer(|footer| footer.text(format!("Page {}/{}", index, last_page_index)))
-                });
-                if last_page_index > 1 {
-                    m.components(|c| {
-                        create_components(c, index != 1, index < last_page_index);
-                        c
-                    });
-                }
-                m
-            })
+            .send(reply)
             .await?
             .into_message()
             .await
@@ -107,7 +108,7 @@ pub async fn list(
         let mut collector = message
             .await_component_interactions(ctx)
             .timeout(TIMEOUT_DURATION)
-            .build();
+            .stream();
         while let Some(interaction) = collector.next().await {
             match interaction.data.custom_id.as_str() {
                 LIST_PREV_BUTTON => {
@@ -126,26 +127,26 @@ pub async fn list(
                 Ok(res) => res,
                 Err(why) => return Err(why),
             };
+
+            let mut components = vec![];
+            if last_page_index > 1 {
+                components = create_navigation_buttons(index != 1, index < last_page_index);
+            }
+
+            let interaction_response = CreateInteractionResponseMessage::default()
+                .embed(CreateEmbed::new()
+                    .title(format!("Announcements for \"{}\"", &name))
+                    .description(content)
+                    .colour(Colour::from_rgb(128, 128, 128))
+                    .footer(CreateEmbedFooter::new(format!("Page {}/{}", index, last_page_index)))
+                )
+                .components(components);
+
             if let Err(why) = interaction
-                .create_interaction_response(&ctx, |response| {
-                    response
-                        .kind(InteractionResponseType::UpdateMessage)
-                        .interaction_response_data(|m| {
-                            m.embed(|e| {
-                                e.title(format!("Announcements for \"{}\"", &name))
-                                    .description(content)
-                                    .colour(Colour::from_rgb(128, 128, 128))
-                                    .footer(|footer| footer.text(format!("Page {}/{}", index, last_page_index)))
-                            });
-                            if last_page_index > 1 {
-                                m.components(|c| {
-                                    create_components(c, index != 1, index < last_page_index);
-                                    c
-                                });
-                            }
-                            m
-                        })
-                })
+                .create_response(
+                    &ctx,
+                    CreateInteractionResponse::UpdateMessage(interaction_response)
+                )
                 .await
             {
                 return Err(Into::into(why));
@@ -262,31 +263,4 @@ async fn create_list(
     }
 
     return Ok((msg_str, last_page_index));
-}
-
-fn create_components(components: &mut CreateComponents, prev: bool, next: bool) -> () {
-    components.create_action_row(|r| {
-        r.create_button(|button| {
-            button
-                .custom_id(LIST_PREV_BUTTON)
-                .label("Previous")
-                .style(ButtonStyle::Secondary);
-
-            if !prev {
-                button.disabled(true);
-            }
-            button
-        })
-        .create_button(|button| {
-            button
-                .custom_id(LIST_NEXT_BUTTON)
-                .label("Next")
-                .style(ButtonStyle::Secondary);
-
-            if !next {
-                button.disabled(true);
-            }
-            button
-        })
-    });
 }

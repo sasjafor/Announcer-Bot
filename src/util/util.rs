@@ -1,5 +1,7 @@
+use poise::CreateReply;
 use rand::{distributions::Uniform, prelude::Distribution};
 use rusqlite::{params, Connection, OptionalExtension};
+use songbird::{input::File, tracks::Track};
 use std::{
     fs::{self, read_dir},
     path::Path,
@@ -9,10 +11,7 @@ use tracing::{debug, error, info, warn};
 
 use serenity::{
     client::Context,
-    model::{
-        guild::Guild,
-        id::{ChannelId, GuildId},
-    },
+    model::id::{ChannelId, GuildId},
 };
 
 use crate::{PContext, PError};
@@ -85,12 +84,11 @@ pub async fn play_file(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, 
         .expect("Songbird Voice client placed in at initialisation.")
         .clone();
 
-    let handler_lock = manager.get_or_insert(songbird::id::GuildId(guild_id.0));
+    let handler_lock = manager.get_or_insert(guild_id);
     let mut handler = handler_lock.lock().await;
 
-    let songbird_channel_id = songbird::id::ChannelId(channel_id.0);
-    if handler.current_channel().is_none() || handler.current_channel().unwrap() != songbird_channel_id {
-        let handler_res = match handler.join(songbird_channel_id).await {
+    if handler.current_channel().is_none() || handler.current_channel().unwrap().0.get() != channel_id.get() {
+        let handler_res = match handler.join(channel_id).await {
             Ok(res) => res,
             Err(err) => {
                 error!(
@@ -112,20 +110,29 @@ pub async fn play_file(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, 
         handler = handler_lock.lock().await;
     }
 
-    let source = match songbird::ffmpeg(path).await {
-        Ok(source) => source,
-        Err(err) => {
-            error!("Err starting source: {:?}", err);
-            return;
-        }
-    };
+    let source = File::new(path.to_owned());
+    let track = Track::from(source);
+    // let mut driver = Driver::new(config);
 
     info!("Playing sound file {}", path);
-    handler.play_source(source);
+    handler.play(track);
 }
 
-pub async fn voice_channel_is_empty(ctx: &Context, guild: &Guild, channel_id: ChannelId) -> bool {
+pub async fn _bot_voice_channel_is_empty(ctx: &Context, guild_id: GuildId) -> bool {
     let mut is_empty = true;
+
+    let guild = guild_id.to_guild_cached(&ctx).unwrap();
+
+    let bot_voice_state = match guild.voice_states.get(&ctx.cache.current_user().id) {
+        Some(voice_state) => voice_state,
+        None => return false
+    };
+
+    let channel_id = match bot_voice_state.channel_id {
+        Some(channel_id) => channel_id,
+        None => return false
+    };
+
     for state in guild
         .voice_states
         .values()
@@ -172,7 +179,12 @@ pub fn print_type_of<T>(_: &T) {
 
 pub async fn send_debug(ctx: PContext<'_>, content: String, err: String) -> Result<(), PError> {
     debug!("{}: {}", content, err);
-    ctx.send(|m| m.content(content).ephemeral(true))
+
+    let reply = CreateReply::default()
+            .content(content)
+            .ephemeral(true);
+
+    ctx.send(reply)
         .await
         .map(drop)
         .map_err(Into::into)
@@ -180,7 +192,12 @@ pub async fn send_debug(ctx: PContext<'_>, content: String, err: String) -> Resu
 
 pub async fn send_warning(ctx: PContext<'_>, content: String, err: String) -> Result<(), PError> {
     warn!("{}: {}", content, err);
-    ctx.send(|m| m.content(content).ephemeral(true))
+
+    let reply = CreateReply::default()
+            .content(content)
+            .ephemeral(true);
+
+    ctx.send(reply)
         .await
         .map(drop)
         .map_err(Into::into)
@@ -188,7 +205,12 @@ pub async fn send_warning(ctx: PContext<'_>, content: String, err: String) -> Re
 
 pub async fn send_error(ctx: PContext<'_>, content: String, err: String) -> Result<(), PError> {
     error!("{}: {}", content, err);
-    ctx.send(|m| m.content(content).ephemeral(true))
+
+    let reply = CreateReply::default()
+            .content(content)
+            .ephemeral(true);
+
+    ctx.send(reply)
         .await
         .map(drop)
         .map_err(Into::into)

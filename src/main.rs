@@ -14,16 +14,13 @@ use std::{
 use songbird::SerenityInit;
 
 use serenity::{
-    async_trait,
-    client::{bridge::gateway::ShardManager, Context, EventHandler},
-    model::{
+    all::{ClientBuilder, ShardManager}, async_trait, client::{Context, EventHandler}, model::{
         event::ResumedEvent,
         gateway::Ready,
-        id::{ChannelId, UserId},
+        id::UserId,
         prelude::*,
         voice::VoiceState,
-    },
-    prelude::{Mutex, TypeMapKey},
+    }, prelude::{Mutex, TypeMapKey}
 };
 
 use rusqlite::{params, Connection};
@@ -33,7 +30,7 @@ use commands::{list::*, new::*, random::*, set::*, names::*};
 
 use util::{check::can_connect, util::send_debug};
 
-use crate::util::util::{announce, play_file, print_type_of, voice_channel_is_empty};
+use crate::util::util::{announce, play_file, print_type_of};
 
 // Types used by all command functions
 type PError = Box<dyn std::error::Error + Send + Sync>;
@@ -61,8 +58,8 @@ impl EventHandler for Handler {
     }
 
     async fn voice_state_update(&self, ctx: Context, old_state: Option<VoiceState>, new_state: VoiceState) {
-        const USER1_ID: UserId = UserId(239705630913331201); // demain
-        const USER2_ID: UserId = UserId(180995420196044809); // seschu
+        const USER1_ID: UserId = UserId::new(239705630913331201); // demain
+        const USER2_ID: UserId = UserId::new(180995420196044809); // seschu
 
         let user_id = new_state.user_id;
 
@@ -87,43 +84,16 @@ impl EventHandler for Handler {
             }
         };
 
-        let guild = match guild_id.to_guild_cached(&ctx) {
-            Some(guild) => guild,
-            None => {
-                info!("Guild not found in cache.");
-                return;
-            }
-        };
-
         let maybe_channel_id = new_state.channel_id;
 
-        if (&old_state).is_some() {
-            if maybe_channel_id.is_none() || !can_connect(&ctx, maybe_channel_id.unwrap()).await {
-                let manager = songbird::get(&ctx)
-                    .await
-                    .expect("Songbird Voice client placed in at initialisation.")
-                    .clone();
+        if !maybe_channel_id.is_some() {
+            return;
+        }
 
-                let handler_lock = manager.get(guild_id);
+        if !(&old_state).is_some() {
+            let cant_connect = !can_connect(&ctx, maybe_channel_id.unwrap());
 
-                if handler_lock.is_some() {
-                    let handler_tmp = handler_lock.unwrap();
-                    let mut handler = handler_tmp.lock().await;
-
-                    let self_channel_id = handler.current_channel();
-
-                    if self_channel_id.is_some() {
-                        if voice_channel_is_empty(&ctx, &guild, ChannelId(self_channel_id.unwrap().0)).await {
-                            let _ = handler.leave().await.expect("Failed to leave voice channel");
-                            info!("Left empty voice channel");
-                            return;
-                        }
-                    }
-                }
-                return;
-            }
-        } else {
-            if maybe_channel_id.is_none() || !can_connect(&ctx, maybe_channel_id.unwrap()).await {
+            if maybe_channel_id.is_none() || cant_connect {
                 return;
             }
 
@@ -131,17 +101,31 @@ impl EventHandler for Handler {
 
             let path = "/config/StGallerConnection.mp3";
             if user_id == USER1_ID {
-                let user_check = guild.voice_states.get(&USER2_ID);
+                let user_check;
+                {
+                    let guild = guild_id.to_guild_cached(&ctx).unwrap();
+                    user_check = match guild.voice_states.get(&USER2_ID) {
+                        Some(user_check) => user_check.channel_id == Some(channel_id),
+                        None => return
+                    };
+                }
 
-                if user_check.is_some() && user_check.unwrap().channel_id == Some(channel_id) {
+                if user_check {
                     let _ = play_file(&ctx, channel_id, guild_id, &path).await;
                 }
             }
 
             if user_id == USER2_ID {
-                let user_check = guild.voice_states.get(&USER1_ID);
+                let user_check;
+                {
+                    let guild = guild_id.to_guild_cached(&ctx).unwrap();
+                    user_check = match guild.voice_states.get(&USER1_ID) {
+                        Some(user_check) => user_check.channel_id == Some(channel_id),
+                        None => return
+                    };
+                }
 
-                if user_check.is_some() && user_check.unwrap().channel_id == Some(channel_id) {
+                if user_check {
                     let _ = play_file(&ctx, channel_id, guild_id, &path).await;
                 }
             }
@@ -152,18 +136,11 @@ impl EventHandler for Handler {
         if !new_state.self_mute {
             info!("UNMUTE!");
 
-            let member = match guild_id.member(&ctx.http, user_id).await {
-                Ok(member) => member,
-                Err(e) => {
-                    error!("Member not found: {:?}", e);
-                    return;
-                }
-            };
+            let member = guild_id.member(&ctx.http, user_id).await.unwrap();
 
             let name = member.display_name().to_string().replace("/", "⁄");
 
-            let _ = announce(&ctx, channel_id, guild_id, &name, user_id.0).await;
-            return;
+            let _ = announce(&ctx, channel_id, guild_id, &name, user_id.get()).await;
         }
     }
 }
@@ -182,7 +159,7 @@ async fn help(
         poise::builtins::HelpConfiguration {
             extra_text_at_bottom: format!(
                 "If you have questions just ask {}",
-                UserId(180995420196044809).mention()
+                UserId::new(180995420196044809).mention()
             )
             .as_str(),
             show_context_menu_commands: true,
@@ -207,7 +184,7 @@ async fn on_error(error: poise::FrameworkError<'_, Data, PError>) {
     // and forward the rest to the default handler
     match error {
         poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {:?}", error),
-        poise::FrameworkError::Command { error, ctx } => {
+        poise::FrameworkError::Command { error, ctx, .. } => {
             println!("Error in command `{}`: {:?}", ctx.command().name, error,);
         }
         error => {
@@ -231,13 +208,14 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     // Login with a bot token from the environment
-    let token = env::var("DISCORD_APP_AUTH_TOKEN").expect("Expected a token in the environment");
+    let token = env::var("DISCORD_APP_AUTH_TOKEN").expect("Expected `DISCORD_APP_AUTH_TOKEN` in the environment");
 
     let intents = GatewayIntents::GUILD_MEMBERS
         | GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::GUILD_VOICE_STATES
         | GatewayIntents::GUILDS
         | GatewayIntents::MESSAGE_CONTENT;
+
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![
@@ -262,10 +240,10 @@ async fn main() {
                         552168558323564544, // announcer-bot-submissions (Test server)
                         511144158975623169, // announcer-bot-submissions (Cupboard under the stairs)
                         780475875698409502, // test channel
-                        739933045406171166, // gay-announcement (Rütlischwur Dudes)
+                        739933045406171166, // announcer-bot-submission (Rütlischwur Dudes)
                         955573958403571822, // announcer-bot-submissions (Spielbande)
                     ]
-                    .contains(&ctx.channel_id().0)
+                    .contains(&ctx.channel_id().get())
                     {
                         return Ok(true);
                     } else {
@@ -287,10 +265,12 @@ async fn main() {
             },
             ..Default::default()
         })
-        .token(token)
-        .intents(intents)
-        .setup(move |_ctx, _ready, _framework| Box::pin(async move { Ok(Data {}) }))
-        .client_settings(move |f| f.register_songbird().event_handler(Handler));
+        .setup(move |_ctx, _ready, _framework| {
+            Box::pin(async move {
+                Ok(Data {})
+            })
+        })
+        .build();
 
     let audio = Path::new("/config/audio");
     let index = Path::new("/config/index");
@@ -345,6 +325,14 @@ async fn main() {
         }
     };
 
-    // currently this is just running without shards, which I think is fine
-    framework.run().await.unwrap();
+    let client = ClientBuilder::new(token, intents)
+        .event_handler(Handler)
+        .framework(framework)
+        .register_songbird()
+        .await;
+
+    client.unwrap()
+        .start()
+        .await
+        .unwrap();
 }

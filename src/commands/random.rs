@@ -1,7 +1,11 @@
+use poise::CreateReply;
 use rusqlite::{params, Connection, OptionalExtension};
 use std::path::Path;
 
-use serenity::{model::prelude::*, utils::Colour};
+use serenity::{all::CreateEmbed, model::{
+    colour::Colour,
+    prelude::*,
+}};
 
 use crate::{util::util::{send_error, send_debug}, PContext, PError};
 
@@ -15,7 +19,7 @@ use crate::{util::util::{send_error, send_debug}, PContext, PError};
 )]
 pub async fn random(ctx: PContext<'_>) -> Result<(), PError> {
     let name = match ctx.author_member().await {
-        Some(member) => member.display_name().into_owned(),
+        Some(member) => member.display_name().to_owned(),
         None => ctx.author().name.clone(),
     };
 
@@ -29,7 +33,7 @@ pub async fn random(ctx: PContext<'_>) -> Result<(), PError> {
         }
     };
 
-    let user_id = ctx.author().id.as_u64();
+    let user_id = ctx.author().id.get();
     let random_res = db
         .query_row::<i32, _, _>("SELECT random FROM names WHERE name=?1", params![&name], |row| {
             row.get(0)
@@ -44,7 +48,7 @@ pub async fn random(ctx: PContext<'_>) -> Result<(), PError> {
     if let Some(random_status) = random_res.unwrap() {
         let update_res = db.execute(
             "UPDATE names SET random = ((random | 1) - (random & 1)) WHERE name=?1 AND user_id=?2",
-            params![&name, *user_id as i64],
+            params![&name, user_id as i64],
         );
     
         if update_res.is_err() {
@@ -60,16 +64,17 @@ pub async fn random(ctx: PContext<'_>) -> Result<(), PError> {
             status_string = "**OFF**";
         }
 
-        ctx.send(|m| {
-            m.embed(|e| {
-                e.title(format!("Toggled random {}", status_string))
-                    .description(format!("{}", ctx.author().mention()))
-                    .colour(Colour::from_rgb(128, 128, 128))
-            })
-        })
-        .await
-        .map(drop)
-        .map_err(Into::into)
+        let reply = CreateReply::default()
+            .embed(CreateEmbed::new()
+                .title(format!("Toggled random {}", status_string))
+                .description(format!("{}", ctx.author().mention()))
+                .colour(Colour::from_rgb(128, 128, 128))
+            );
+
+        ctx.send(reply)
+            .await
+            .map(drop)
+            .map_err(Into::into)
     } else {
         let why = name;
         let err_str = format!("Name doesn't exist");

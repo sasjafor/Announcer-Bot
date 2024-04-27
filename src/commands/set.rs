@@ -2,20 +2,26 @@ use rusqlite::{params, Connection};
 use std::{fs, path::Path, time::Duration};
 use tracing::debug;
 
-use poise::futures_util::StreamExt;
+use poise::{futures_util::StreamExt, CreateReply};
 use serenity::{
-    builder::{CreateComponents, CreateSelectMenuOption},
+    all::{
+        CreateActionRow, 
+        CreateEmbed, 
+        CreateInteractionResponse, 
+        CreateInteractionResponseMessage, 
+        CreateSelectMenu, 
+        CreateSelectMenuKind
+    }, 
+    builder::CreateSelectMenuOption, 
     model::{
-        application::interaction::InteractionResponseType,
-        prelude::*
-    },
-    utils::Colour,
+        colour::Colour,
+        prelude::*,
+    }
 };
 
 use crate::{
     util::{
-        component_ids::*,
-        util::{send_debug, send_error, send_warning}, consts::{ELEMENTS_PER_MENU, ELEMENT_LABEL_LENGTH},
+        component_ids::*, consts::{ELEMENTS_PER_MENU, ELEMENT_LABEL_LENGTH}, messages::create_navigation_buttons, util::{send_debug, send_error, send_warning}
     },
     PContext, PError,
 };
@@ -49,17 +55,20 @@ pub async fn set(
 
     if let Some(announcement_name) = name {
         match set_fn(ctx, &announcement_name, &discord_user, &discord_name).await {
-            Ok(_) => ctx
-                .send(|m| {
-                    m.embed(|e| {
-                        e.title(format!("Set announcement"))
-                            .description(format!("`{}` [{}]", &announcement_name, &discord_user.mention()))
-                            .colour(Colour::from_rgb(128, 128, 128))
-                    })
-                })
-                .await
-                .map(drop)
-                .map_err(Into::into),
+            Ok(_) => {
+                let reply = CreateReply::default()
+                    .embed(CreateEmbed::new()
+                        .title(format!("Set announcement"))
+                        .description(format!("`{}` [{}]", &announcement_name, &discord_user.mention()))
+                        .colour(Colour::from_rgb(128, 128, 128))
+                    );
+
+                ctx
+                    .send(reply)
+                    .await
+                    .map(drop)
+                    .map_err(Into::into)
+            },
             Err(why) => Err(why),
         }
     } else {
@@ -69,50 +78,47 @@ pub async fn set(
             Err(why) => return Err(why),
         };
 
+        let reply = CreateReply::default()
+            .content("Choose an announcement")
+            .components(create_dropdown(false, over_limit, options));
+
         let message = ctx
-            .send(|m| {
-                m.content("Choose an announcement");
-                    m.components(|c| {
-                        create_dropdown(c, false, over_limit, options);
-                        c
-                    });
-                m
-            })
-            .await?
-            .into_message()
-            .await
-            .unwrap();
+            .send(reply)
+                .await?
+                .into_message()
+                .await
+                .unwrap();
 
         let mut collector = message
             .await_component_interactions(ctx)
             .timeout(TIMEOUT_DURATION)
-            .build();
+            .stream();
         while let Some(interaction) = collector.next().await {
             match interaction.data.custom_id.as_str() {
                 ANNOUNCEMENT_SELECTOR_DROPDOWN => {
-                    let announcement_name = interaction.data.values.first().unwrap().to_owned();
+                    let announcement_name = interaction.data.custom_id.clone();
                     return match set_fn(ctx, &announcement_name, &discord_user, &discord_name).await {
-                        Ok(_) => interaction
-                            .create_interaction_response(&ctx, |response| {
-                                response
-                                    .kind(InteractionResponseType::UpdateMessage)
-                                    .interaction_response_data(|m| {
-                                        m.content("")
-                                            .embed(|e| {
-                                                e.title(format!("Set announcement"))
-                                                    .description(format!(
-                                                        "`{}` [{}]",
-                                                        &announcement_name,
-                                                        &discord_user.mention()
-                                                    ))
-                                                    .colour(Colour::from_rgb(128, 128, 128))
-                                            })
-                                            .components(|c| c)
-                                    })
-                            })
-                            .await
-                            .map(drop)
-                            .map_err(Into::into),
+                        Ok(_) => {
+                            let interaction_response = CreateInteractionResponseMessage::default()
+                                .embed(CreateEmbed::new()
+                                    .title(format!("Set announcement"))
+                                    .description(format!(
+                                        "`{}` [{}]",
+                                        &announcement_name,
+                                        &discord_user.mention()
+                                    ))
+                                    .colour(Colour::from_rgb(128, 128, 128))
+                                );
+
+                            interaction
+                                .create_response(
+                                    &ctx, 
+                                    CreateInteractionResponse::UpdateMessage(interaction_response)
+                                )
+                                .await
+                                .map(drop)
+                                .map_err(Into::into)
+                        },
                         Err(why) => Err(why),
                     };
                 }
@@ -133,17 +139,15 @@ pub async fn set(
                 Ok(res) => res,
                 Err(why) => return Err(why),
             };
+
+            let interaction_response = CreateInteractionResponseMessage::default()
+                .components(create_dropdown(index > 1, over_limit, options));
+
             if let Err(why) = interaction
-                .create_interaction_response(&ctx, |response| {
-                    response
-                        .kind(InteractionResponseType::UpdateMessage)
-                        .interaction_response_data(|m| {
-                            m.components(|c| {
-                                create_dropdown(c, index > 1, over_limit, options);
-                                c
-                            })
-                        })
-                })
+                .create_response(
+                    &ctx,
+                    CreateInteractionResponse::UpdateMessage(interaction_response)
+                )
                 .await
             {
                 return Err(Into::into(why));
@@ -182,11 +186,11 @@ async fn set_fn(
         }
     };
 
-    let user_id = discord_user.id.as_u64();
+    let user_id = discord_user.id.get();
     let insert_res = db.execute(
         "INSERT OR REPLACE INTO names (name, user_id, active_file)
             VALUES (?1, ?2, ?3)",
-        params![discord_name, *user_id as i64, announcement_name],
+        params![discord_name, user_id as i64, announcement_name],
     );
 
     if insert_res.is_err() {
@@ -250,9 +254,7 @@ async fn create_dropdown_options(
                 };
             }
 
-            let announcement: CreateSelectMenuOption = CreateSelectMenuOption::default()
-                .label(announcement_name.clone())
-                .value(announcement_name)
+            let announcement: CreateSelectMenuOption = CreateSelectMenuOption::new(announcement_name.clone(), announcement_name)
                 .to_owned();
             options.push(announcement);
 
@@ -268,36 +270,23 @@ async fn create_dropdown_options(
 }
 
 fn create_dropdown(
-    components: &mut CreateComponents,
     prev: bool,
     next: bool,
     options: Vec<CreateSelectMenuOption>,
-) -> () {
-    components
-        .create_action_row(|r| {
-            r.create_select_menu(|s| {
-                s.custom_id(ANNOUNCEMENT_SELECTOR_DROPDOWN)
-                    .min_values(1)
-                    .max_values(1)
-                    .options(|c| c.set_options(options))
+) -> Vec<CreateActionRow> {
+    let mut action_row = vec![
+        CreateActionRow::SelectMenu(
+            CreateSelectMenu::new(ANNOUNCEMENT_SELECTOR_DROPDOWN, CreateSelectMenuKind::String {
+                options
             })
-        });
-        if prev || next {
-            components.create_action_row(|r| {
-                r.create_button(|b| {
-                    b.custom_id(ANNOUNCEMENT_SELECTOR_PREV_BUTTON).label("Prev");
-                    if !prev {
-                        b.disabled(true);
-                    }
-                    b
-                })
-                .create_button(|b| {
-                    b.custom_id(ANNOUNCEMENT_SELECTOR_NEXT_BUTTON).label("Next");
-                    if !next {
-                        b.disabled(true);
-                    }
-                    b
-                })
-            });
-    };
+            .min_values(1)
+            .max_values(1)
+        )
+    ];
+
+    if prev || next {
+        create_navigation_buttons(prev, next).append(&mut action_row)
+    }
+
+    return action_row;
 }
