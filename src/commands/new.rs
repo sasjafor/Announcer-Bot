@@ -278,8 +278,10 @@ pub async fn add_new_file(
 
     let user_id = user.id.get();
     let insert_res = db.execute(
-        "INSERT OR REPLACE INTO names (name, user_id, active_file)
-            VALUES (?1, ?2, ?3)",
+        "INSERT OR IGNORE INTO names (name, user_id, active_file)
+              VALUES (?1, ?2, ?3) 
+              ON CONFLICT(name, user_id) DO UPDATE SET
+                active_file=excluded.active_file",
         params![&name, user_id as i64, announcement_name],
     );
     if insert_res.is_err() {
