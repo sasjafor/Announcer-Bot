@@ -96,7 +96,14 @@ pub async fn set(
         while let Some(interaction) = collector.next().await {
             match interaction.data.custom_id.as_str() {
                 ANNOUNCEMENT_SELECTOR_DROPDOWN => {
-                    let announcement_name = interaction.data.custom_id.clone();
+                    let announcement_name;
+                    if let ComponentInteractionDataKind::StringSelect { values } = &interaction.data.kind {
+                        announcement_name = values.first().unwrap().to_owned();
+                    } else {
+                        let why = &interaction.data.custom_id;
+                        let err_str = "No select menu data was found for".to_string();
+                        return send_warning(ctx, err_str, why.to_string()).await;
+                    }
                     return match set_fn(ctx, &announcement_name, &discord_user, &discord_name).await {
                         Ok(_) => {
                             let interaction_response = CreateInteractionResponseMessage::default()
