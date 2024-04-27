@@ -84,35 +84,18 @@ pub async fn play_file(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, 
         .expect("Songbird Voice client placed in at initialisation.")
         .clone();
 
-    let handler_lock = manager.get_or_insert(guild_id);
-    let mut handler = handler_lock.lock().await;
-
-    if handler.current_channel().is_none() || handler.current_channel().unwrap().0.get() != channel_id.get() {
-        let handler_res = match handler.join(channel_id).await {
-            Ok(res) => res,
-            Err(err) => {
-                error!(
-                    "Failed to send connect request for channel with id {} with err {}",
-                    channel_id, err
-                );
-                return;
-            }
-        };
-        drop(handler);
-        let _ = match handler_res.await {
-            Ok(_res) => _res,
+    let handler_lock = match manager.join(guild_id, channel_id).await {
+        Ok(handler_lock) => handler_lock,
             Err(err) => {
                 error!("Failed to connect to channel with id {} with err {}", channel_id, err);
                 return;
             }
         };
 
-        handler = handler_lock.lock().await;
-    }
+    let mut handler = handler_lock.lock().await;
 
     let source = File::new(path.to_owned());
     let track = Track::from(source);
-    // let mut driver = Driver::new(config);
 
     info!("Playing sound file {}", path);
     handler.play(track);
