@@ -18,7 +18,7 @@ use crate::{
     PContext, PError,
 };
 
-const TIMEOUT_DURATION: Duration = Duration::from_secs(300);
+const TIMEOUT_DURATION: Duration = Duration::from_secs(600);
 const ELEMENTS_PER_PAGE: usize = 10;
 
 #[doc = "List all names that have available announcements."]
