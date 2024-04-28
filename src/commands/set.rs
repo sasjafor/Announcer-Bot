@@ -115,7 +115,8 @@ pub async fn set(
                                         &discord_user.mention()
                                     ))
                                     .colour(Colour::from_rgb(128, 128, 128))
-                                );
+                                )
+                                .components(vec![]);
 
                             interaction
                                 .create_response(
