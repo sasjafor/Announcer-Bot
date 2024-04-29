@@ -132,7 +132,7 @@ impl EventHandler for Handler {
             }
         }
 
-        if (!(&old_state).is_some() && !new_state.self_mute) || 
+        if ((&old_state).is_none() && !new_state.self_mute) || 
            ((&old_state).is_some() && old_state.unwrap().self_mute && !new_state.self_mute) {
             info!("UNMUTE!");
 
