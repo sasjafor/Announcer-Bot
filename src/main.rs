@@ -133,7 +133,7 @@ impl EventHandler for Handler {
         }
 
         if (!(&old_state).is_some() && !new_state.self_mute) || 
-           (old_state.unwrap().self_mute && !new_state.self_mute) {
+           ((&old_state).is_some() && old_state.unwrap().self_mute && !new_state.self_mute) {
             info!("UNMUTE!");
 
             let member = guild_id.member(&ctx.http, user_id).await.unwrap();
