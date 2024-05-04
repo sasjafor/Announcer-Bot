@@ -21,7 +21,12 @@ use serenity::{
 
 use crate::{
     util::{
-        component_ids::*, consts::{ELEMENTS_PER_MENU, ELEMENT_LABEL_LENGTH}, messages::create_navigation_buttons, util::{send_debug, send_error, send_warning}
+        component_ids::*, 
+        consts::{
+            BOT_ADMIN_USER_ID, ELEMENTS_PER_MENU, ELEMENT_LABEL_LENGTH
+        }, 
+        messages::create_navigation_buttons, 
+        util::{send_debug, send_error, send_warning}
     },
     PContext, PError,
 };
@@ -96,6 +101,13 @@ pub async fn set(
         while let Some(interaction) = collector.next().await {
             match interaction.data.custom_id.as_str() {
                 ANNOUNCEMENT_SELECTOR_DROPDOWN => {
+                    if interaction.user.id.get() != BOT_ADMIN_USER_ID && 
+                       interaction.user.id != discord_user.id 
+                    {
+                        let why = "";
+                        let err_str = "You may only select an announcement for yourself".to_string();
+                        return send_warning(ctx, err_str, why.to_string()).await;
+                    }
                     let announcement_name;
                     if let ComponentInteractionDataKind::StringSelect { values } = &interaction.data.kind {
                         announcement_name = values.first().unwrap().to_owned();

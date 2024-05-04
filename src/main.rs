@@ -30,7 +30,10 @@ use commands::{list::*, new::*, random::*, set::*, names::*};
 
 use util::{check::can_connect, util::send_debug};
 
-use crate::util::util::{announce, play_file, print_type_of};
+use crate::util::{
+    consts::{BOT_ADMIN_USER_ID, CUZ_USER_ID}, 
+    util::{announce, play_file, print_type_of}
+};
 
 // Types used by all command functions
 type PError = Box<dyn std::error::Error + Send + Sync>;
@@ -58,8 +61,8 @@ impl EventHandler for Handler {
     }
 
     async fn voice_state_update(&self, ctx: Context, old_state: Option<VoiceState>, new_state: VoiceState) {
-        const USER1_ID: UserId = UserId::new(239705630913331201); // demain
-        const USER2_ID: UserId = UserId::new(180995420196044809); // seschu
+        const USER1_ID: UserId = UserId::new(CUZ_USER_ID);
+        const USER2_ID: UserId = UserId::new(BOT_ADMIN_USER_ID);
 
         let user_id = new_state.user_id;
 
