@@ -243,7 +243,7 @@ async fn main() {
                         552168558323564544, // announcer-bot-submissions (Test server)
                         511144158975623169, // announcer-bot-submissions (Cupboard under the stairs)
                         780475875698409502, // test channel
-                        739933045406171166, // announcer-bot-submission (Rütlischwur Dudes)
+                        739933045406171166, // announcer-bot-submissions (Rütlischwur Dudes)
                         955573958403571822, // announcer-bot-submissions (Spielbande)
                     ]
                     .contains(&ctx.channel_id().get())
