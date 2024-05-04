@@ -13,7 +13,10 @@ use serenity::{
 
 use crate::{
     util::{
-        component_ids::{NAMES_LIST_NEXT_BUTTON, NAMES_LIST_PREV_BUTTON}, consts::EMBED_DESCRIPTION_MAX_LENGTH, messages::create_navigation_buttons, util::{send_debug, send_error, send_warning}
+        component_ids::{LIST_NEXT_BUTTON, LIST_PREV_BUTTON}, 
+        consts::EMBED_DESCRIPTION_MAX_LENGTH, 
+        messages::create_navigation_buttons, 
+        util::{send_debug, send_error, send_warning}
     },
     PContext, PError,
 };
@@ -73,10 +76,10 @@ pub async fn names(
             .stream();
         while let Some(interaction) = collector.next().await {
             match interaction.data.custom_id.as_str() {
-                NAMES_LIST_PREV_BUTTON => {
+                LIST_PREV_BUTTON => {
                     index -= 1;
                 }
-                NAMES_LIST_NEXT_BUTTON => {
+                LIST_NEXT_BUTTON => {
                     index += 1;
                 }
                 _ => {
