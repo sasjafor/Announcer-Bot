@@ -11,8 +11,9 @@ use serenity::{all::CreateEmbed, model::{
 
 use crate::{
     util::{
-        parse::parse_duration,
-        util::{send_debug, send_error}, consts::ELEMENT_LABEL_LENGTH,
+        consts::{BOT_ADMIN_USER_ID, ELEMENT_LABEL_LENGTH}, 
+        parse::parse_duration, 
+        util::{send_debug, send_error}
     },
     PContext, PError,
 };
@@ -64,10 +65,23 @@ pub async fn file(
     #[description = "Name of the announcement."] announcement: String,
     #[description = "Audio file to be used as announcement."] file: Attachment,
     #[description = "FFMPEG filters to transform audio."] filters: Option<String>,
+    #[description = "Override the length limit"] override_length_limit: Option<bool>,
 ) -> Result<(), PError> {
-    let announcement_length = announcement.chars().count();
-    if announcement_length > ELEMENT_LABEL_LENGTH {
-        let why = announcement_length;
+    let mut override_length = false;
+    if override_length_limit.is_some() {
+        override_length = override_length_limit.unwrap();
+        if override_length {
+            if ctx.author().id.get() != BOT_ADMIN_USER_ID {
+                let why = "".to_string();
+                let err_str = "You are not allowed to use the length override!".to_string();
+                return send_debug(ctx, err_str, why).await;
+            }
+        }
+    }
+
+    let announcement_name_length = announcement.chars().count();
+    if announcement_name_length > ELEMENT_LABEL_LENGTH {
+        let why = announcement_name_length;
         let err_str = "Announcement name is too long".to_string();
         return send_debug(ctx, err_str, why.to_string()).await;
     }
@@ -104,7 +118,7 @@ pub async fn file(
         return send_error(ctx, err_str, why.to_string()).await;
     }
 
-    return add_new_file(ctx, &discord_name, &announcement, &user, filters.as_ref()).await;
+    return add_new_file(ctx, &discord_name, &announcement, &user, filters.as_ref(), override_length).await;
 }
 
 #[doc = "Add new announcement using a url."]
@@ -123,7 +137,20 @@ pub async fn url(
     #[description = "Start time."] start: String,
     #[description = "End time."] end: String,
     #[description = "FFMPEG filters to transform audio."] filters: Option<String>,
+    #[description = "Override the length limit"] override_length_limit: Option<bool>,
 ) -> Result<(), PError> {
+    let mut override_length = false;
+    if override_length_limit.is_some() {
+        override_length = override_length_limit.unwrap();
+        if override_length {
+            if ctx.author().id.get() != BOT_ADMIN_USER_ID {
+                let why = "".to_string();
+                let err_str = "You are not allowed to use the length override!".to_string();
+                return send_debug(ctx, err_str, why).await;
+            }
+        }
+    }
+
     let discord_name = match ctx.guild_id() {
         Some(guild_id) => match user.nick_in(&ctx, guild_id).await {
             Some(nick) => nick,
@@ -147,7 +174,7 @@ pub async fn url(
     let end_parsed = parse_duration(&end).unwrap();
     let duration = end_parsed - start_parsed;
 
-    if duration > Duration::from_secs(7) {
+    if !override_length && duration > Duration::from_secs(7) {
         let why = duration.as_secs_f64();
         let err_str = "Duration is too long".to_string();
         return send_debug(ctx, err_str, why.to_string()).await;
@@ -208,7 +235,7 @@ pub async fn url(
         return send_error(ctx, err_str, why.to_string()).await;
     }
 
-    return add_new_file(ctx, &discord_name, &announcement, &user, filters.as_ref()).await;
+    return add_new_file(ctx, &discord_name, &announcement, &user, filters.as_ref(), override_length).await;
 }
 
 pub async fn add_new_file(
@@ -217,6 +244,7 @@ pub async fn add_new_file(
     announcement_name: &String,
     user: &User,
     filters: Option<&String>,
+    override_length: bool,
 ) -> Result<(), PError> {
     let filename = format!("{}.flac", &announcement_name);
     let processed_filename = format!("{}{}", &announcement_name, ".processed.flac");
@@ -231,10 +259,14 @@ pub async fn add_new_file(
         normalize_and_filter_string = "loudnorm".to_string();
     }
 
+    let mut args = vec!["-y"];
+    if !override_length {
+        args.push("-t");
+        args.push("00:00:06");
+    }
+
     let filter_output = Command::new("ffmpeg")
-        .arg("-y")
-        .arg("-t")
-        .arg("00:00:06")
+        .args(args)
         .arg("-i")
         .arg(format!("file:{}", &filename))
         .arg("-filter:a")
@@ -248,8 +280,13 @@ pub async fn add_new_file(
         .output()
         .expect("Failed to run ffmpeg");
 
+    let mut ffmpeg_length_str = "";
+    if !override_length {
+        ffmpeg_length_str = " -t 00:00:06"
+    }
     debug!(
-        "ffmpeg -y -t 00:00:06 -i {} -filter:a {} -ar 48000 -f flac {}",
+        "ffmpeg -y{} -i {} -filter:a {} -ar 48000 -f flac {}",
+        ffmpeg_length_str,
         format!("file:{}", &filename),
         &normalize_and_filter_string,
         format!("file:{}", &processed_filename)
