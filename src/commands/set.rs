@@ -20,10 +20,16 @@ use serenity::{
 };
 
 use crate::{
-    util::{
-        component_ids::*, 
+    util::{ 
+        component_ids::{
+            ANNOUNCEMENT_SELECTOR_DROPDOWN, 
+            LIST_NEXT_BUTTON, 
+            LIST_PREV_BUTTON
+        }, 
         consts::{
-            BOT_ADMIN_USER_ID, ELEMENTS_PER_MENU, ELEMENT_LABEL_LENGTH
+            BOT_ADMIN_USER_ID, 
+            ELEMENTS_PER_MENU, 
+            ELEMENT_LABEL_LENGTH
         }, 
         messages::create_navigation_buttons, 
         util::{send_debug, send_error, send_warning}
@@ -142,10 +148,10 @@ pub async fn set(
                         Err(why) => Err(why),
                     };
                 }
-                ANNOUNCEMENT_SELECTOR_PREV_BUTTON => {
+                LIST_PREV_BUTTON => {
                     index -= 1;
                 }
-                ANNOUNCEMENT_SELECTOR_NEXT_BUTTON => {
+                LIST_NEXT_BUTTON => {
                     index += 1;
                 }
                 _ => {
@@ -305,7 +311,8 @@ fn create_dropdown(
     ];
 
     if prev || next {
-        create_navigation_buttons(prev, next).append(&mut action_row)
+        let mut navigation_buttons = create_navigation_buttons(prev, next);
+        action_row.append(&mut navigation_buttons);
     }
 
     return action_row;
