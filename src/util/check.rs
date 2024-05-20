@@ -7,7 +7,12 @@ use serenity::{
 };
 
 /// Checks if user can connect to a voice channel
-pub fn can_connect(ctx: &Context, channel_id: ChannelId) -> bool {
+pub fn can_connect(ctx: &Context, channel_id_opt: Option<ChannelId>) -> bool {
+    let channel_id = match channel_id_opt {
+        Some(channel_id) => channel_id,
+        None => return false,
+    };
+
     let channel = match ctx.cache.channel(channel_id) {
         Some(channel) => channel,
         None => return false,

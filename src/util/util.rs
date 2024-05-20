@@ -143,7 +143,7 @@ pub async fn bot_voice_channel_is_empty(ctx: &Context, guild_id: GuildId) -> boo
             Some(member) => &member.user,
             None => {
                 error!("Error retrieving user from channel: {:?}", channel_id);
-                return is_empty;
+                continue;
             }
         };
         is_empty &= user.bot;

@@ -60,7 +60,7 @@ impl EventHandler for Handler {
         info!("Resumed");
     }
 
-    async fn voice_state_update(&self, ctx: Context, old_state: Option<VoiceState>, new_state: VoiceState) {
+    async fn voice_state_update(&self, ctx: Context, old_state_opt: Option<VoiceState>, new_state: VoiceState) {
         const USER1_ID: UserId = UserId::new(CUZ_USER_ID);
         const USER2_ID: UserId = UserId::new(BOT_ADMIN_USER_ID);
 
@@ -87,28 +87,37 @@ impl EventHandler for Handler {
             }
         };
 
-        if bot_voice_channel_is_empty(&ctx, guild_id).await {
-            leave_channel(&ctx, guild_id).await;
-            info!("Left empty voice channel");
-            return;
+        let maybe_channel_id = new_state.channel_id;
+        let new_channel_exists = maybe_channel_id.is_some();
+        let cant_connect = !can_connect(&ctx, maybe_channel_id);
+
+        if let Some(old_state) = &old_state_opt {
+            if !new_channel_exists ||
+               (new_channel_exists &&
+               (guild_id != old_state.guild_id.unwrap() ||
+                cant_connect)) {
+
+                let prev_guild_id = old_state.guild_id.unwrap();
+                if bot_voice_channel_is_empty(&ctx, prev_guild_id).await {
+                    leave_channel(&ctx, prev_guild_id).await;
+                    info!("Left empty voice channel");
+                    return;
+                }
+            }
         }
 
-        let maybe_channel_id = new_state.channel_id;
-
-        if !maybe_channel_id.is_some() {
+        if !new_channel_exists {
+            debug!("New channel doesn't exist.");
             return;
         }
         let channel_id = maybe_channel_id.unwrap();
 
-        if !(&old_state).is_some() {
-            let cant_connect = !can_connect(&ctx, maybe_channel_id.unwrap());
+        if cant_connect {
+            debug!("Not allowed to connect to new channel.");
+            return;
+        }
 
-            if maybe_channel_id.is_none() || cant_connect {
-                return;
-            }
-
-            let channel_id = maybe_channel_id.unwrap();
-
+        if !(&old_state_opt).is_some() {
             let path = "/config/StGallerConnection.flac";
             if user_id == USER1_ID {
                 let user_check;
@@ -141,8 +150,10 @@ impl EventHandler for Handler {
             }
         }
 
-        if ((&old_state).is_none() && !new_state.self_mute) || 
-           ((&old_state).is_some() && old_state.unwrap().self_mute && !new_state.self_mute) {
+        if ((&old_state_opt).is_none() && !new_state.self_mute) || 
+           ((&old_state_opt).is_some() && 
+            (old_state_opt.as_ref().unwrap().self_mute || old_state_opt.as_ref().unwrap().channel_id.unwrap() != channel_id) && 
+             !new_state.self_mute) {
             info!("UNMUTE!");
 
             let member = guild_id.member(&ctx.http, user_id).await.unwrap();
