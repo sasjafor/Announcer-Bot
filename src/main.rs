@@ -97,11 +97,12 @@ impl EventHandler for Handler {
                (Some(guild_id) != old_state.guild_id ||
                 cant_connect)) {
 
-                let prev_guild_id = old_state.guild_id.unwrap();
-                if bot_voice_channel_is_empty(&ctx, prev_guild_id).await {
-                    leave_channel(&ctx, prev_guild_id).await;
-                    info!("Left empty voice channel");
-                    return;
+                if let Some(prev_guild_id) = old_state.guild_id {
+                    if bot_voice_channel_is_empty(&ctx, prev_guild_id).await {
+                        leave_channel(&ctx, prev_guild_id).await;
+                        info!("Left empty voice channel");
+                        return;
+                    }
                 }
             }
         }
