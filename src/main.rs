@@ -94,7 +94,7 @@ impl EventHandler for Handler {
         if let Some(old_state) = &old_state_opt {
             if !new_channel_exists ||
                (new_channel_exists &&
-               (guild_id != old_state.guild_id.unwrap() ||
+               (Some(guild_id) != old_state.guild_id ||
                 cant_connect)) {
 
                 let prev_guild_id = old_state.guild_id.unwrap();
