@@ -101,7 +101,25 @@ pub async fn play_file(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, 
     handler.play(track);
 }
 
-pub async fn _bot_voice_channel_is_empty(ctx: &Context, guild_id: GuildId) -> bool {
+pub async fn leave_channel(ctx: &Context, guild_id: GuildId) {
+    let manager = songbird::get(ctx)
+        .await
+        .expect("Songbird Voice client placed in at initialisation.")
+        .clone();
+
+    let handler_lock = match manager.get(guild_id) {
+        Some(handler_lock) => handler_lock,
+        None => {
+            error!("Bot is not in a voice channel for guild: {}", guild_id);
+            return;
+        }
+    };
+
+    let mut handler = handler_lock.lock().await;
+    let _ = handler.leave().await.expect("Failed to leave voice channel");
+}
+
+pub async fn bot_voice_channel_is_empty(ctx: &Context, guild_id: GuildId) -> bool {
     let mut is_empty = true;
 
     let guild = guild_id.to_guild_cached(&ctx).unwrap();
@@ -121,10 +139,10 @@ pub async fn _bot_voice_channel_is_empty(ctx: &Context, guild_id: GuildId) -> bo
         .values()
         .filter(|state| state.channel_id == Some(channel_id))
     {
-        let user = match state.user_id.to_user(ctx).await {
-            Ok(user) => user,
-            Err(err) => {
-                error!("Error retrieving user: {:?}", err);
+        let user = match &state.member {
+            Some(member) => &member.user,
+            None => {
+                error!("Error retrieving user from channel: {:?}", channel_id);
                 return is_empty;
             }
         };

@@ -32,7 +32,7 @@ use util::{check::can_connect, util::send_debug};
 
 use crate::util::{
     consts::{BOT_ADMIN_USER_ID, CUZ_USER_ID}, 
-    util::{announce, play_file, print_type_of}
+    util::{announce, bot_voice_channel_is_empty, leave_channel, play_file, print_type_of}
 };
 
 // Types used by all command functions
@@ -86,6 +86,12 @@ impl EventHandler for Handler {
                 return;
             }
         };
+
+        if bot_voice_channel_is_empty(&ctx, guild_id).await {
+            leave_channel(&ctx, guild_id).await;
+            info!("Left empty voice channel");
+            return;
+        }
 
         let maybe_channel_id = new_state.channel_id;
 
