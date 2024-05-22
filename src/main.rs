@@ -3,9 +3,9 @@ mod util;
 
 use std::{
     env,
-    fs::{self},
+    fs,
     path::Path,
-    sync::Arc,
+    sync::Arc, time::Duration,
 };
 
 // This trait adds the `register_songbird` and `register_songbird_with` methods
@@ -24,6 +24,7 @@ use serenity::{
 };
 
 use rusqlite::{params, Connection};
+use tokio::{task, time};
 use tracing::{debug, error, info};
 
 use commands::{list::*, new::*, random::*, set::*, names::*};
@@ -351,6 +352,15 @@ async fn main() {
         .framework(framework)
         .register_songbird()
         .await;
+
+    task::spawn(async {
+        let mut interval = time::interval(Duration::from_secs(300));
+
+        loop {
+            interval.tick().await;
+            let _ = reqwest::get("https://hc-ping.com/9ed4f8c2-9f99-4b67-9868-31cbbbd0f4f2").await;
+        }
+    });
 
     client.unwrap()
         .start()
