@@ -1,5 +1,5 @@
 use poise::CreateReply;
-use rand::{distributions::Uniform, prelude::Distribution};
+use rand::{distr::Uniform, prelude::Distribution};
 use rusqlite::{params, Connection, OptionalExtension};
 use songbird::{input::File, tracks::Track};
 use std::{
@@ -60,9 +60,9 @@ pub async fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, n
 
         let count = files.unwrap().count();
         if random && count > 0 {
-            let between = Uniform::from(0..count);
-            let mut rng = rand::thread_rng();
-            let index = between.sample(&mut rng);
+            let between = Uniform::try_from(0..count);
+            let mut rng = rand::rng();
+            let index = between.expect("Random issue").sample(&mut rng);
 
             let mut paths = read_dir(&index_base_path).unwrap();
             path = paths.nth(index).unwrap().unwrap().path().to_str().unwrap().to_owned();

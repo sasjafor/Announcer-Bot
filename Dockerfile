@@ -1,4 +1,4 @@
-FROM rust:1.77 as builder
+FROM rust:1.86 as builder
 
 # Create empty shell project
 RUN USER=root cargo new --bin announcer_bot
@@ -50,7 +50,7 @@ COPY --from=builder /announcer_bot/target/release/announcer_bot /bin
 
 WORKDIR /
 
-# Install youtube-dl
+# Install yt-dlp
 ADD https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp /usr/local/bin/
 RUN chmod a+rx /usr/local/bin/yt-dlp
 

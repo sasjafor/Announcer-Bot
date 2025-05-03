@@ -2,10 +2,7 @@ mod commands;
 mod util;
 
 use std::{
-    env,
-    fs,
-    path::Path,
-    sync::Arc, time::Duration,
+    collections::HashSet, env, fs, path::Path, sync::Arc, time::Duration
 };
 
 // This trait adds the `register_songbird` and `register_songbird_with` methods
@@ -14,13 +11,13 @@ use std::{
 use songbird::SerenityInit;
 
 use serenity::{
-    all::{ClientBuilder, ShardManager}, async_trait, client::{Context, EventHandler}, model::{
+    all::{ClientBuilder, Http, ShardManager}, async_trait, client::{Context, EventHandler}, model::{
         event::ResumedEvent,
         gateway::Ready,
         id::UserId,
         prelude::*,
         voice::VoiceState,
-    }, prelude::{Mutex, TypeMapKey}
+    }, prelude::TypeMapKey
 };
 
 use rusqlite::{params, Connection};
@@ -43,10 +40,10 @@ type PContext<'a> = poise::Context<'a, Data, PError>;
 // Custom user data passed to all command functions
 pub struct Data {}
 
-struct ShardManagerContainer;
+pub struct ShardManagerContainer;
 
 impl TypeMapKey for ShardManagerContainer {
-    type Value = Arc<Mutex<ShardManager>>;
+    type Value = Arc<ShardManager>;
 }
 
 struct Handler;
@@ -88,9 +85,10 @@ impl EventHandler for Handler {
             }
         };
 
+        let maybe_guild_id = new_state.guild_id;
         let maybe_channel_id = new_state.channel_id;
         let new_channel_exists = maybe_channel_id.is_some();
-        let cant_connect = !can_connect(&ctx, maybe_channel_id);
+        let cant_connect = !can_connect(&ctx, maybe_guild_id, maybe_channel_id);
 
         if let Some(old_state) = &old_state_opt {
             if !new_channel_exists ||
@@ -232,6 +230,20 @@ async fn main() {
     // Login with a bot token from the environment
     let token = env::var("DISCORD_APP_AUTH_TOKEN").expect("Expected `DISCORD_APP_AUTH_TOKEN` in the environment");
 
+    let http = Http::new(&token);
+
+    let (_owners, _bot_id) = match http.get_current_application_info().await {
+        Ok(info) => {
+            let mut owners = HashSet::new();
+            if let Some(owner) = &info.owner {
+                owners.insert(owner.id);
+            }
+
+            (owners, info.id)
+        },
+        Err(why) => panic!("Could not access application info: {:?}", why),
+    };
+
     let intents = GatewayIntents::GUILD_MEMBERS
         | GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::GUILD_VOICE_STATES
@@ -347,13 +359,25 @@ async fn main() {
         }
     };
 
-    let client = ClientBuilder::new(token, intents)
+    let mut client = ClientBuilder::new(token, intents)
         .event_handler(Handler)
         .framework(framework)
         .register_songbird()
-        .await;
+        .await
+        .expect("Err creating client");
 
-    task::spawn(async {
+    {
+        let mut data = client.data.write().await;
+        let shard_manager = client.shard_manager.clone().to_owned();
+        data.insert::<ShardManagerContainer>(shard_manager);
+    }
+
+    let shard_manager = client.shard_manager.clone();
+
+    task::spawn(async move {
+        tokio::signal::ctrl_c().await.expect("Could not register ctrl+c handler");
+        shard_manager.shutdown_all().await;
+        
         let mut interval = time::interval(Duration::from_secs(300));
 
         loop {
@@ -362,8 +386,7 @@ async fn main() {
         }
     });
 
-    client.unwrap()
-        .start()
-        .await
-        .unwrap();
+    if let Err(why) = client.start().await {
+        error!("Client error: {:?}", why);
+    }
 }
