@@ -377,7 +377,9 @@ async fn main() {
     task::spawn(async move {
         tokio::signal::ctrl_c().await.expect("Could not register ctrl+c handler");
         shard_manager.shutdown_all().await;
-        
+    });
+
+    task::spawn(async {
         let mut interval = time::interval(Duration::from_secs(300));
 
         loop {
