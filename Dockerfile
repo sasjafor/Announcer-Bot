@@ -1,4 +1,4 @@
-FROM rust:1.90 as builder
+FROM rust:1.90-trixie as builder
 
 # Create empty shell project
 RUN USER=root cargo new --bin announcer_bot
@@ -23,7 +23,7 @@ ADD . ./
 RUN rm ./target/release/deps/announcer_bot*
 RUN RUSTFLAGS='-C link-arg=-s' cargo build --release
 
-FROM debian:bullseye-slim
+FROM debian:trixie-slim
 
 # Set log level
 ENV RUST_LOG announcer_bot=info
