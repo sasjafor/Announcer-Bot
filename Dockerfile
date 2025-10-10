@@ -23,7 +23,7 @@ ADD . ./
 RUN rm ./target/release/deps/announcer_bot*
 RUN RUSTFLAGS='-C link-arg=-s' cargo build --release
 
-FROM debian:bookworm-slim
+FROM debian:bullseye-slim
 
 # Set log level
 ENV RUST_LOG announcer_bot=info
