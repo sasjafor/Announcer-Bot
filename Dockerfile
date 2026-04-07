@@ -1,4 +1,4 @@
-FROM rust:1.94.1-alpine3.23 as builder
+FROM rust:1.94.1-alpine3.23 AS builder
 
 # Create empty shell project
 RUN USER=root cargo new --bin announcer_bot
@@ -6,7 +6,7 @@ RUN USER=root cargo new --bin announcer_bot
 WORKDIR /announcer_bot
 
 # Copy manifest
-COPY ./Cargo.toml ./Cargo.toml
+COPY ./Cargo.toml .
 
 # Install dependencies
 RUN apk update && \
@@ -36,7 +36,10 @@ RUN RUSTFLAGS='-C link-arg=-s' cargo build --release
 FROM rust:1.94.1-alpine3.23
 
 # Set log level
-ENV RUST_LOG announcer_bot=info
+ENV RUST_LOG=announcer_bot=info
+ENV PATH="$PATH:/usr/local/bin"
+
+WORKDIR /announcer_bot
 
 # Setup apt, install package dependencies and create /config
 RUN apk update && \
@@ -52,17 +55,15 @@ RUN apk update && \
     mkdir /config
 
 # Copy run script
-COPY src/run /usr/local/bin/
+COPY src/run .
 
 # Copy executable
-COPY --from=builder /announcer_bot/target/release/announcer_bot /usr/local/bin/
-
-WORKDIR /
+COPY --from=builder /announcer_bot/target/release/announcer_bot .
 
 # Install yt-dlp
-ADD https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp /usr/local/bin/
+ADD https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp /usr/local/bin
 RUN chmod a+rx /usr/local/bin/yt-dlp
 
 # Set run command
 VOLUME /config
-CMD ["run"]
+CMD ["/announcer_bot/run"]
