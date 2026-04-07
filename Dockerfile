@@ -1,4 +1,4 @@
-FROM rust:1.90-trixie as builder
+FROM rust:1.94.1-alpine3.23 as builder
 
 # Create empty shell project
 RUN USER=root cargo new --bin announcer_bot
@@ -8,9 +8,19 @@ WORKDIR /announcer_bot
 # Copy manifest
 COPY ./Cargo.toml ./Cargo.toml
 
-# Install cmake
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends cmake libopus-dev
+# Install dependencies
+RUN apk update && \
+    apk add autoconf \
+            automake \
+            build-base \
+            cmake \
+            file \
+            g++ \
+            libtool \
+            openssl-dev \
+            pkgconf
+
+ENV OPUS_NO_PKG_CONFIG=1
 
 # Build dependencies
 RUN RUSTFLAGS='-C link-arg=-s' cargo build --release
@@ -23,30 +33,29 @@ ADD . ./
 RUN rm ./target/release/deps/announcer_bot*
 RUN RUSTFLAGS='-C link-arg=-s' cargo build --release
 
-FROM debian:trixie-slim
+FROM rust:1.94.1-alpine3.23
 
 # Set log level
 ENV RUST_LOG announcer_bot=info
 
 # Setup apt, install package dependencies and create /config
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends  ca-certificates \
-                                                espeak \
-                                                ffmpeg \
-                                                lame \
-                                                libopus0 \
-                                                libopus-dev \
-                                                libsqlite3-dev \
-                                                python-is-python3 \
-                                                vorbis-tools \
-                                                && \
+RUN apk update && \
+    apk add --no-cache  ca-certificates \
+                        espeak \
+                        ffmpeg \
+                        lame \
+                        opus \
+                        sqlite \
+                        python3 \
+                        vorbis-tools \
+                        && \
     mkdir /config
 
 # Copy run script
-COPY src/run /bin
+COPY src/run /usr/local/bin/
 
 # Copy executable
-COPY --from=builder /announcer_bot/target/release/announcer_bot /bin
+COPY --from=builder /announcer_bot/target/release/announcer_bot /usr/local/bin/
 
 WORKDIR /
 

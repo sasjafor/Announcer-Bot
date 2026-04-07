@@ -1,6 +1,6 @@
 [package]
 name = "announcer_bot"
-version = "0.4.2"
+version = "0.5.0"
 authors = ["sasjafor <sascha.forster@hotmail.ch>"]
 edition = "2021"
 
@@ -11,29 +11,37 @@ opt-level = 3
 codegen-units = 1
 
 [dependencies]
-env_logger = "0.11.8"
+env_logger = "0.11.10"
 lazy_static = "1.5.0"
 libsodium-sys = "0.2.7"
-log = "0.4.27"
+log = "0.4.29"
 poise = "0.6.1"
-rand = "0.9.1"
-regex = "1.11.1"
-reqwest = "0.12.15"
-rusqlite = "0.35.0"
-tracing = "0.1.41"
-tracing-subscriber = "0.3.19"
+rand = "0.10.0"
+regex = "1.12.3"
+reqwest = "0.13.2"
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
 tracing-futures = "0.2.5" # needed so instrument works with async functions.
-url = "2.5.4"
+url = "2.5.8"
+
+[dependencies.rustls]
+version = "0.23.37"
+default-features = false
+features = ["aws-lc-rs"]
+
+[dependencies.rusqlite]
+version = "0.39.0"
+features = ["bundled"]
 
 [dependencies.songbird]
-version = "0.5.0"
+version = "0.6.0"
 
 [dependencies.symphonia]
-version = "0.5.4"
+version = "0.5.5"
 features = [ "aac", "mp3", "alac", "flac" ]
 
 [dependencies.tokio]
-version = "1.44.2"
+version = "1.51.0"
 features = ["macros", "signal", "rt-multi-thread"]
 
 [dependencies.serenity]
@@ -49,4 +57,7 @@ features = [
     "voice",
     "rustls_backend",
 ]
-version = "0.12.4"
+version = "0.12.5"
+
+# [patch.crates-io]
+# rustls = { version = "0.23.37", default-features = false, features = ["ring"] }

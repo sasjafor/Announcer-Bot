@@ -4,6 +4,7 @@ mod util;
 use std::{
     collections::HashSet, env, fs, path::Path, sync::Arc, time::Duration
 };
+use rustls::crypto::CryptoProvider;
 
 // This trait adds the `register_songbird` and `register_songbird_with` methods
 // to the client builder below, making it easy to install this voice client.
@@ -226,6 +227,10 @@ async fn main() {
     // This environment variable is already preset if you use cargo-make to run
     // the example.
     tracing_subscriber::fmt::init();
+
+    CryptoProvider::install_default(
+        rustls::crypto::ring::default_provider()
+    ).unwrap();
 
     // Login with a bot token from the environment
     let token = env::var("DISCORD_APP_AUTH_TOKEN").expect("Expected `DISCORD_APP_AUTH_TOKEN` in the environment");
