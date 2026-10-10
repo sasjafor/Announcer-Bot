@@ -174,20 +174,39 @@ async fn help(
     #[autocomplete = "poise::builtins::autocomplete_command"]
     command: Option<String>,
 ) -> Result<(), PError> {
-    poise::builtins::help(
-        ctx,
-        command.as_deref(),
-        poise::builtins::HelpConfiguration {
-            extra_text_at_bottom: format!(
-                "If you have questions just ask {}",
-                UserId::new(180995420196044809).mention()
-            )
-            .as_str(),
-            show_context_menu_commands: true,
-            ..Default::default()
-        },
-    )
-    .await?;
+    let commands = &ctx.framework().options.commands;
+    let content = if let Some(name) = command {
+        match commands.iter().find(|item| item.name == name) {
+            Some(item) => format!(
+                "**!{}**\n{}{}",
+                item.name,
+                item.description.as_deref().unwrap_or(""),
+                item.help_text
+                    .as_deref()
+                    .map(|text| format!("\n\n{text}"))
+                    .unwrap_or_default(),
+            ),
+            None => format!("No command named `{name}` was found."),
+        }
+    } else {
+        let mut lines = commands
+            .iter()
+            .filter(|item| !item.hide_in_help)
+            .map(|item| {
+                format!(
+                    "**!{}** — {}",
+                    item.name,
+                    item.description.as_deref().unwrap_or("No description available")
+                )
+            })
+            .collect::<Vec<_>>();
+        lines.push(format!(
+            "If you have questions just ask {}",
+            UserId::new(180995420196044809).mention()
+        ));
+        lines.join("\n")
+    };
+    ctx.say(content).await?;
     Ok(())
 }
 

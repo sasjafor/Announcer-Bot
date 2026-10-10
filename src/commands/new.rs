@@ -18,26 +18,20 @@ use crate::{
     PContext, PError,
 };
 
-fn new_help() -> String {
-    return "\
-Submit a new announcement either as file or url.
-Usage:  
-!new file <discordname> <announcement-name> [<filters>]
-!new url <discordname> <announcement-name> <url> <start time> <end time> [<filters>]
-
-Examples:
-!new file @Yzarul \"funny noise\"
-!new file @Yzarul \"funny noise\" \"vibrato\"
-!new url @Yzarul \"funny noise\" \"https://www.youtube.com/watch?v=dQw4w9WgXcQ\" 20 25
-!new url @Yzarul \"funny noise\" \"https://www.youtube.com/watch?v=dQw4w9WgXcQ\" 02:20 02:25
-!new url @Yzarul \"funny noise\" \"https://www.youtube.com/watch?v=dQw4w9WgXcQ\" 02:20 02:25 vibrato=d=1.0
-
-See all filters here https://ffmpeg.org/ffmpeg-filters.html
-"
-    .to_string();
-}
-
-#[doc = "Submit a new announcement either as file or url."]
+/// Submit a new announcement either as file or url.
+///
+/// Usage:
+/// !new file <discordname> <announcement-name> [<filters>]
+/// !new url <discordname> <announcement-name> <url> <start time> <end time> [<filters>]
+///
+/// Examples:
+/// !new file @Yzarul "funny noise"
+/// !new file @Yzarul "funny noise" "vibrato"
+/// !new url @Yzarul "funny noise" "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 20 25
+/// !new url @Yzarul "funny noise" "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 02:20 02:25
+/// !new url @Yzarul "funny noise" "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 02:20 02:25 vibrato=d=1.0
+///
+/// See all filters here https://ffmpeg.org/ffmpeg-filters.html
 #[poise::command(
     category = "Main Commands",
     guild_only,
@@ -45,7 +39,6 @@ See all filters here https://ffmpeg.org/ffmpeg-filters.html
     slash_command,
     required_bot_permissions = "SEND_MESSAGES",
     subcommands("file", "url"),
-    help_text_fn = "new_help"
 )]
 pub async fn new(_ctx: PContext<'_>) -> Result<(), PError> {
     return Ok(());

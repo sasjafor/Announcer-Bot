@@ -1,20 +1,58 @@
 use poise::CreateReply;
 use rand::{distr::Uniform, prelude::Distribution};
 use rusqlite::{params, Connection, OptionalExtension};
-use songbird::{input::File, tracks::Track};
+use songbird::{
+    events::{Event, EventContext, EventData, EventHandler, TrackEvent},
+    input::File,
+    tracks::{Track, TrackState},
+};
 use std::{
     fs::{self, read_dir},
     path::Path,
     process::Command,
+    time::Duration,
 };
 use tracing::{debug, error, info, warn};
 
 use serenity::{
+    async_trait,
     client::Context,
     model::id::{ChannelId, GuildId},
 };
 
 use crate::{PContext, PError};
+
+struct PlaybackEventLogger {
+    path: String,
+    event_name: &'static str,
+}
+
+#[async_trait]
+impl EventHandler for PlaybackEventLogger {
+    async fn act(&self, ctx: &EventContext<'_>) -> Option<Event> {
+        if let EventContext::Track(tracks) = ctx {
+            if let Some((state, _)) = tracks.first() {
+                log_playback_event(self.event_name, &self.path, state);
+            }
+        }
+
+        Some(Event::Cancel)
+    }
+}
+
+fn log_playback_event(event_name: &str, path: &str, state: &TrackState) {
+    if event_name == "error" {
+        error!(
+            "Songbird track {event_name}: path={path}, ready={:?}, position={:?}, play_time={:?}",
+            state.ready, state.position, state.play_time
+        );
+    } else {
+        info!(
+            "Songbird track {event_name}: path={path}, ready={:?}, position={:?}, play_time={:?}",
+            state.ready, state.position, state.play_time
+        );
+    }
+}
 
 pub async fn announce(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, name: &str, user_id: u64) {
     let db_path = Path::new("/config/database/db.sqlite");
@@ -95,9 +133,25 @@ pub async fn play_file(ctx: &Context, channel_id: ChannelId, guild_id: GuildId, 
     let mut handler = handler_lock.lock().await;
 
     let source = File::new(path.to_owned());
-    let track = Track::from(source);
+    let mut track = Track::from(source);
+    for (event, event_name) in [
+        (TrackEvent::Playable, "playable"),
+        (TrackEvent::End, "end"),
+        (TrackEvent::Error, "error"),
+    ] {
+        track.events.add_event(
+            EventData::new(
+                Event::Track(event),
+                PlaybackEventLogger {
+                    path: path.to_owned(),
+                    event_name,
+                },
+            ),
+            Duration::ZERO,
+        );
+    }
 
-    info!("Playing sound file {}", path);
+    info!("Queueing sound file {}", path);
     handler.play(track);
 }
 

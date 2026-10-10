@@ -36,9 +36,12 @@ pub async fn names(
     ctx: PContext<'_>,
     #[description = "The page index."]
     #[min = 1]
-    index: Option<usize>,
+    index: Option<u64>,
 ) -> Result<(), PError> {
-    let mut index = index.unwrap_or(1);
+    let mut index = index
+        .unwrap_or(1)
+        .try_into()
+        .unwrap_or(usize::MAX / ELEMENTS_PER_PAGE);
 
     let path_string = format!("/config/index/");
     let path = Path::new(&path_string);

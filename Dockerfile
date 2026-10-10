@@ -1,4 +1,4 @@
-FROM rust:1.94.1-alpine3.23 AS builder
+FROM rust:1.99.0-alpine3.24 AS builder
 
 # Create empty shell project
 RUN USER=root cargo new --bin announcer_bot
@@ -33,7 +33,7 @@ ADD . ./
 RUN rm ./target/release/deps/announcer_bot*
 RUN RUSTFLAGS='-C link-arg=-s' cargo build --release
 
-FROM rust:1.94.1-alpine3.23
+FROM rust:1.99.0-alpine3.24
 
 # Set log level
 ENV RUST_LOG=announcer_bot=info

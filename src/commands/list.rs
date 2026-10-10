@@ -38,7 +38,7 @@ pub async fn list(
     #[description = "The name for which to list announcements."] name: Option<String>,
     #[description = "The page index."]
     #[min = 1]
-    index: Option<usize>,
+    index: Option<u64>,
 ) -> Result<(), PError> {
     let name = match name {
         Some(name) => name,
@@ -50,7 +50,10 @@ pub async fn list(
             }
         }
     };
-    let mut index = index.unwrap_or(1);
+    let mut index = index
+        .unwrap_or(1)
+        .try_into()
+        .unwrap_or(usize::MAX / ELEMENTS_PER_PAGE);
 
     let path_string = format!("/config/index/{}", &name);
     let path = Path::new(&path_string);
