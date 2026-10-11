@@ -1,69 +1,20 @@
-FROM rust:1.99.0-alpine3.24 AS builder
+FROM rust:1.99.0-alpine3.24 AS build
 
-# Create empty shell project
-RUN USER=root cargo new --bin announcer_bot
+WORKDIR /app
+RUN apk add --no-cache build-base cmake pkgconf
+ENV OPUS_BUNDLED=1
 
-WORKDIR /announcer_bot
+COPY Cargo.toml Cargo.lock ./
+COPY src ./src
+RUN RUSTFLAGS='-C link-arg=-s' cargo build --locked --release
 
-# Copy manifest
-COPY ./Cargo.toml .
+FROM alpine:3.24
+ENV RUST_LOG=warn
 
-# Install dependencies
-RUN apk update && \
-    apk add autoconf \
-            automake \
-            build-base \
-            cmake \
-            file \
-            g++ \
-            libtool \
-            openssl-dev \
-            pkgconf
-
-ENV OPUS_NO_PKG_CONFIG=1
-
-# Build dependencies
-RUN RUSTFLAGS='-C link-arg=-s' cargo build --release
-
-RUN rm src/*.rs
-
-ADD . ./
-
-# Build for release
-RUN rm ./target/release/deps/announcer_bot*
-RUN RUSTFLAGS='-C link-arg=-s' cargo build --release
-
-FROM rust:1.99.0-alpine3.24
-
-# Set log level
-ENV RUST_LOG=announcer_bot=info
-ENV PATH="$PATH:/usr/local/bin"
-
-WORKDIR /announcer_bot
-
-# Setup apt, install package dependencies and create /config
-RUN apk update && \
-    apk add --no-cache  ca-certificates \
-                        espeak \
-                        ffmpeg \
-                        lame \
-                        opus \
-                        sqlite \
-                        python3 \
-                        vorbis-tools \
-                        && \
-    mkdir /config
-
-# Copy run script
-COPY src/run .
-
-# Copy executable
-COPY --from=builder /announcer_bot/target/release/announcer_bot .
-
-# Install yt-dlp
-ADD https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp /usr/local/bin
+RUN apk add --no-cache ca-certificates espeak ffmpeg
+COPY --from=build /app/target/release/announcer_bot /usr/local/bin/announcer_bot
+ADD https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp /usr/local/bin/yt-dlp
 RUN chmod a+rx /usr/local/bin/yt-dlp
 
-# Set run command
-VOLUME /config
-CMD ["/announcer_bot/run"]
+VOLUME ["/config"]
+CMD ["/usr/local/bin/announcer_bot"]

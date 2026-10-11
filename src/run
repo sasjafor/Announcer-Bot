@@ -1,2 +1,0 @@
-#!/bin/sh
-DISCORD_APP_AUTH_TOKEN=${DISCORD_APP_AUTH_TOKEN} RUST_LOG=warn exec ./announcer_bot
